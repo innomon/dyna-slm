@@ -32,24 +32,26 @@ func TestDatabaseIntegration(t *testing.T) {
 	}
 
 	// 2. Test Upsert
+	tableName := "filesys"
 	mockAsset := Asset{
 		Path:     "test/image.jpg",
 		Metadata: map[string]interface{}{"type": "test", "label": "cat"},
 		Content:  []byte("fake-image-data"),
-		// 1152 dimensions for T5Gemma 2-270M
-		Embedding: make([]float32, 1152),
+		// 640 dimensions for T5Gemma 2-270M
+		Embedding: make([]float32, 640),
 	}
 	// Set a few values to make it non-zero
 	mockAsset.Embedding[0] = 0.5
 	mockAsset.Embedding[1] = -0.5
 
-	err = UpsertAsset(ctx, pool, mockAsset)
+	err = UpsertAsset(ctx, pool, tableName, mockAsset)
 	if err != nil {
 		t.Fatalf("UpsertAsset failed: %v", err)
 	}
+	defer CleanUp(pool, tableName)
 
 	// 3. Test Search
-	results, err := SearchSimilar(ctx, pool, mockAsset.Embedding, 1)
+	results, err := SearchSimilar(ctx, pool, tableName, "", mockAsset.Embedding, 1)
 	if err != nil {
 		t.Fatalf("SearchSimilar failed: %v", err)
 	}
@@ -63,7 +65,8 @@ func TestDatabaseIntegration(t *testing.T) {
 	}
 }
 
-func CleanUp(pool *pgxpool.Pool) {
+func CleanUp(pool *pgxpool.Pool, tableName string) {
 	ctx := context.Background()
-	_, _ = pool.Exec(ctx, "DELETE FROM filesys WHERE path = 'test/image.jpg'")
+	query := "DELETE FROM " + tableName + " WHERE path = 'test/image.jpg'"
+	_, _ = pool.Exec(ctx, query)
 }

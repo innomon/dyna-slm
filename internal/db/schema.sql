@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS filesys (
     metadata JSONB,
     content BYTEA,
     tmstamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    embedding vector(1152) -- For T5Gemma 2-270M
+    embedding vector(640) -- For T5Gemma 2-270M
 );
 
 -- Index metadata
