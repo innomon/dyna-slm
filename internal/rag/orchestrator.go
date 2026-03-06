@@ -136,7 +136,7 @@ func (o *Orchestrator) Generate(ctx context.Context, text string, imagePath stri
 	}
 
 	// 5. Decode response
-	response, err := o.Tokenizer.Decode(decoderIds[1:]) // Skip BOS
+	response, err := o.Tokenizer.Decode(decoderIds[1:], true) // Skip BOS
 	if err != nil {
 		return "", err
 	}

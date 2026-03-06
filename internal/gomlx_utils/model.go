@@ -13,6 +13,7 @@ import (
 	"github.com/gomlx/gomlx/pkg/core/shapes"
 	"github.com/gomlx/gomlx/pkg/core/tensors"
 	"github.com/gomlx/gomlx/pkg/ml/context"
+	"github.com/innomon/gomlx-pgvect-rag/internal/embedder"
 	"github.com/nlpodyssey/safetensors"
 )
 
@@ -34,29 +35,31 @@ func InitializeBackend() (backends.Backend, error) {
 type Model struct {
 	Backend      backends.Backend
 	Context      *context.Context
+	Config       *embedder.Config
 	ExecEmbed    *graph.Exec
 	ExecGenerate *graph.Exec
 }
 
 // NewModel initializes the GoMLX context.
-func NewModel(backend backends.Backend) *Model {
+func NewModel(backend backends.Backend, cfg *embedder.Config) *Model {
 	return &Model{
 		Backend: backend,
 		Context: context.New(),
+		Config:  cfg,
 	}
 }
 
 // CompileEmbed compiles the multimodal embedding graph for inference.
-func (m *Model) CompileEmbed(buildFn func(ctx *context.Context, textIds, imagePixels *graph.Node) *graph.Node) {
+func (m *Model) CompileEmbed(buildFn func(ctx *context.Context, textIds, imagePixels *graph.Node, cfg *embedder.Config) *graph.Node) {
 	m.ExecEmbed = graph.MustNewExec(m.Backend, func(textIds, imagePixels *graph.Node) *graph.Node {
-		return buildFn(m.Context, textIds, imagePixels)
+		return buildFn(m.Context, textIds, imagePixels, m.Config)
 	})
 }
 
 // CompileGenerate compiles the multimodal generation graph.
-func (m *Model) CompileGenerate(buildFn func(ctx *context.Context, textIds, imagePixels, decoderIds *graph.Node) *graph.Node) {
+func (m *Model) CompileGenerate(buildFn func(ctx *context.Context, textIds, imagePixels, decoderIds *graph.Node, cfg *embedder.Config) *graph.Node) {
 	m.ExecGenerate = graph.MustNewExec(m.Backend, func(textIds, imagePixels, decoderIds *graph.Node) *graph.Node {
-		return buildFn(m.Context, textIds, imagePixels, decoderIds)
+		return buildFn(m.Context, textIds, imagePixels, decoderIds, m.Config)
 	})
 }
 

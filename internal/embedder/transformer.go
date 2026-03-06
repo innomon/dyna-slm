@@ -34,11 +34,11 @@ func MLP(ctx *context.Context, x *Node, intermediateDim int) *Node {
 }
 
 // MultiHeadAttention implements the Gemma 3 attention mechanism.
-func MultiHeadAttention(ctx *context.Context, x *Node, numHeads, numKVHeads, headDim, slidingWindow int, ropeTheta float64, mask *Node) *Node {
+func MultiHeadAttention(ctx *context.Context, x *Node, numHeads, numKVHeads, headDim, slidingWindow int, ropeTheta float64, useCausalMask bool) *Node {
 	ctx = ctx.In("attention")
 	mha := layers.MultiHeadAttention(ctx, x, x, x, numHeads, numHeads*headDim)
-	if mask != nil {
-		mha.SetMask(mask)
+	if useCausalMask {
+		mha.UseCausalMask()
 	}
 	return mha.Done()
 }
@@ -52,7 +52,7 @@ func CrossAttention(ctx *context.Context, x, encoderStates *Node, numHeads, head
 // EncoderBlock represents a single Gemma 3 transformer layer.
 func EncoderBlock(ctx *context.Context, x *Node, numHeads, numKVHeads, headDim, intermediateDim, slidingWindow int, ropeTheta float64) *Node {
 	normX := RMSNorm(ctx.In("pre_attention_norm"), x, 1e-6)
-	attn := MultiHeadAttention(ctx, normX, numHeads, numKVHeads, headDim, slidingWindow, ropeTheta, nil)
+	attn := MultiHeadAttention(ctx, normX, numHeads, numKVHeads, headDim, slidingWindow, ropeTheta, false)
 	x = Add(x, attn)
 	normX = RMSNorm(ctx.In("pre_mlp_norm"), x, 1e-6)
 	mlpOut := MLP(ctx, normX, intermediateDim)
@@ -61,10 +61,10 @@ func EncoderBlock(ctx *context.Context, x *Node, numHeads, numKVHeads, headDim, 
 }
 
 // DecoderBlock represents a single T5Gemma 2 decoder layer.
-func DecoderBlock(ctx *context.Context, x, encoderStates *Node, numHeads, numKVHeads, headDim, intermediateDim, slidingWindow int, ropeTheta float64, selfMask *Node) *Node {
+func DecoderBlock(ctx *context.Context, x, encoderStates *Node, numHeads, numKVHeads, headDim, intermediateDim, slidingWindow int, ropeTheta float64, useCausalMask bool) *Node {
 	// 1. Self-Attention (Causal)
 	normX := RMSNorm(ctx.In("pre_self_attention_norm"), x, 1e-6)
-	selfAttn := MultiHeadAttention(ctx, normX, numHeads, numKVHeads, headDim, slidingWindow, ropeTheta, selfMask)
+	selfAttn := MultiHeadAttention(ctx, normX, numHeads, numKVHeads, headDim, slidingWindow, ropeTheta, useCausalMask)
 	x = Add(x, selfAttn)
 
 	// 2. Cross-Attention
@@ -79,53 +79,36 @@ func DecoderBlock(ctx *context.Context, x, encoderStates *Node, numHeads, numKVH
 	return x
 }
 
-// Gemma3Encoder assembles 18 transformer layers for T5Gemma 2-270M.
-func Gemma3Encoder(ctx *context.Context, x *Node) *Node {
+// Gemma3Encoder assembles transformer layers based on SubConfig.
+func Gemma3Encoder(ctx *context.Context, x *Node, cfg *SubConfig) *Node {
 	ctx = ctx.In("gemma3_encoder")
-	numLayers := 18
-	numHeads := 4
-	numKVHeads := 1
-	headDim := 256
-	intermediateDim := 2048
-	slidingWindow := 512
 
-	for i := 0; i < numLayers; i++ {
+	for i := 0; i < cfg.NumHiddenLayers; i++ {
 		layerCtx := ctx.In(fmt.Sprintf("%d", i))
 		ropeTheta := 10000.0
-		currentSlidingWindow := slidingWindow
+		currentSlidingWindow := cfg.SlidingWindow
 		if (i+1)%6 == 0 {
 			ropeTheta = 1000000.0
 			currentSlidingWindow = -1
 		}
-		x = EncoderBlock(layerCtx, x, numHeads, numKVHeads, headDim, intermediateDim, currentSlidingWindow, ropeTheta)
+		x = EncoderBlock(layerCtx, x, cfg.NumAttentionHeads, cfg.NumKeyValueHeads, cfg.HeadDim, cfg.IntermediateSize, currentSlidingWindow, ropeTheta)
 	}
-	return RMSNorm(ctx.In("final_norm"), x, 1e-6)
+	return RMSNorm(ctx.In("final_norm"), x, cfg.RMSNormEps)
 }
 
-// Gemma3Decoder assembles 18 transformer layers for T5Gemma 2-270M decoder.
-func Gemma3Decoder(ctx *context.Context, x, encoderStates *Node) *Node {
+// Gemma3Decoder assembles transformer layers based on SubConfig.
+func Gemma3Decoder(ctx *context.Context, x, encoderStates *Node, cfg *SubConfig) *Node {
 	ctx = ctx.In("gemma3_decoder")
-	numLayers := 18
-	numHeads := 4
-	numKVHeads := 1
-	headDim := 256
-	intermediateDim := 2048
-	slidingWindow := 512
 
-	// Create causal mask
-	g := x.Graph()
-	seqLen := x.Shape().Dimensions[1]
-	selfMask := layers.CausalMask(g, seqLen)
-
-	for i := 0; i < numLayers; i++ {
+	for i := 0; i < cfg.NumHiddenLayers; i++ {
 		layerCtx := ctx.In(fmt.Sprintf("%d", i))
 		ropeTheta := 10000.0
-		currentSlidingWindow := slidingWindow
+		currentSlidingWindow := cfg.SlidingWindow
 		if (i+1)%6 == 0 {
 			ropeTheta = 1000000.0
 			currentSlidingWindow = -1
 		}
-		x = DecoderBlock(layerCtx, x, encoderStates, numHeads, numKVHeads, headDim, intermediateDim, currentSlidingWindow, ropeTheta, selfMask)
+		x = DecoderBlock(layerCtx, x, encoderStates, cfg.NumAttentionHeads, cfg.NumKeyValueHeads, cfg.HeadDim, cfg.IntermediateSize, currentSlidingWindow, ropeTheta, true)
 	}
-	return RMSNorm(ctx.In("final_norm"), x, 1e-6)
+	return RMSNorm(ctx.In("final_norm"), x, cfg.RMSNormEps)
 }

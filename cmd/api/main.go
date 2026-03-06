@@ -46,14 +46,20 @@ func main() {
 		log.Fatalf("GoMLX initialization failed: %v", err)
 	}
 
-	// 2. Initialize Model and Load Weights
-	model := gomlx_utils.NewModel(backend)
+	// 2. Load Model Config, Initialize Model and Load Weights
+	configPath := filepath.Join(weightsDir, "config.json")
+	cfg, err := embedder.LoadConfig(configPath)
+	if err != nil {
+		log.Fatalf("Failed to load config from %s: %v", configPath, err)
+	}
+
+	model := gomlx_utils.NewModel(backend, cfg)
 	if weightsDir != "" {
 		fmt.Fprintf(os.Stderr, "📂 Loading weights from: %s\n", weightsDir)
 		if err := model.LoadSafetensors(weightsDir); err != nil {
 			log.Fatalf("Failed to load weights: %v", err)
 		}
-		// Compile the graph once weights are loaded
+		// Compile the graphs once weights are loaded
 		fmt.Fprintf(os.Stderr, "🛠️  Compiling GoMLX graphs...\n")
 		model.CompileEmbed(embedder.EmbedMultimodalGraph)
 		model.CompileGenerate(embedder.GenerateMultimodalGraph)

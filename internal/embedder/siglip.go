@@ -56,37 +56,37 @@ func SigLIPTransformerBlock(ctx *context.Context, x *Node, numHeads, intermediat
 	return x
 }
 
-// SigLIPVisionEncoder processes image tokens (27 layers).
-func SigLIPVisionEncoder(ctx *context.Context, x *Node) *Node {
+// SigLIPVisionEncoder processes image tokens based on configuration.
+func SigLIPVisionEncoder(ctx *context.Context, x *Node, cfg *VisionConfig) *Node {
 	ctx = ctx.In("siglip_vision")
 	g := x.Graph()
 	
-	// 1. Patch Embedding (Convolution with stride 14)
+	// 1. Patch Embedding (Convolution)
 	x = layers.Convolution(ctx.In("patch_embed"), x).
-		Filters(1152).
-		KernelSize(14).
-		Strides(14).
+		Filters(cfg.HiddenSize).
+		KernelSize(cfg.PatchSize).
+		Strides(cfg.PatchSize).
 		Done()
 		
 	// 2. Flatten and add Positional Embeddings
 	batchSize := x.Shape().Dimensions[0]
-	x = Reshape(x, batchSize, 4096, 1152)
+	numPatches := (cfg.ImageSize / cfg.PatchSize) * (cfg.ImageSize / cfg.PatchSize)
+	x = Reshape(x, batchSize, numPatches, cfg.HiddenSize)
 	
-	posEmbed := ctx.VariableWithShape("position_embeddings", shapes.Make(x.DType(), 4096, 1152)).ValueGraph(g)
+	posEmbed := ctx.VariableWithShape("position_embeddings", shapes.Make(x.DType(), numPatches, cfg.HiddenSize)).ValueGraph(g)
 	x = Add(x, posEmbed)
 	
-	// 3. Token Reduction: 4096 -> 256
-	x = Reshape(x, batchSize, 16, 4, 16, 4, 1152)
-	x = ReduceMean(x, 2, 4)
-	x = Reshape(x, batchSize, 256, 1152)
+	// 3. Token Reduction (Standard for Gemma 3: 4096 -> 256)
+	// We assume a fixed reduction for now as seen in Gemma 3 specs
+	if numPatches == 4096 {
+		x = Reshape(x, batchSize, 16, 4, 16, 4, cfg.HiddenSize)
+		x = ReduceMean(x, 2, 4)
+		x = Reshape(x, batchSize, 256, cfg.HiddenSize)
+	}
 	
-	numLayers := 27
-	numHeads := 16
-	intermediateDim := 4304
-	
-	for i := 0; i < numLayers; i++ {
+	for i := 0; i < cfg.NumHiddenLayers; i++ {
 		layerCtx := ctx.In(fmt.Sprintf("%d", i))
-		x = SigLIPTransformerBlock(layerCtx, x, numHeads, intermediateDim)
+		x = SigLIPTransformerBlock(layerCtx, x, cfg.NumAttentionHeads, cfg.IntermediateSize)
 	}
 	
 	return layers.LayerNormalization(ctx.In("final_norm"), x, -1).Done()

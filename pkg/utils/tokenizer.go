@@ -37,5 +37,17 @@ func (t *Tokenizer) Encode(text string, addSpecialTokens bool) ([]uint32, error)
 	return ids, nil
 }
 
+// Decode converts token IDs back into text.
+func (t *Tokenizer) Decode(ids []uint32, skipSpecialTokens bool) (string, error) {
+	// Convert []uint32 to []int
+	intIds := make([]int, len(ids))
+	for i, id := range ids {
+		intIds[i] = int(id)
+	}
+	
+	text := t.tk.Decode(intIds, skipSpecialTokens)
+	return text, nil
+}
+
 // Close is a no-op for pure Go tokenizer.
 func (t *Tokenizer) Close() {}
