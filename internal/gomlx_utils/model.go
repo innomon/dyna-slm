@@ -19,13 +19,13 @@ import (
 
 // InitializeBackend sets up the XLA backend for GoMLX.
 func InitializeBackend() (backends.Backend, error) {
-	if os.Getenv("GOMLX_BACKEND") == "" {
-		os.Setenv("GOMLX_BACKEND", "xla")
-	}
+	// Set the environment variable programmatically to hardcode XLA
+	os.Setenv("GOMLX_BACKEND", "xla")
 
+	// Updated v0.26.0 Signature: returns (Backend, error)
 	backend, err := backends.New()
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize GoMLX backend: %w", err)
+		return nil, fmt.Errorf("failed to create backend: %+v", err)
 	}
 
 	return backend, nil

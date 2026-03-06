@@ -1,17 +1,20 @@
-# gomlx-pgvect-rag
+# Dyna-SLM: Dynamic Data Tuned Small Language Model
 
-A high-performance Multimodal Retrieval-Augmented Generation (RAG) system using **T5Gemma 2** (based on the **Gemma 3** architecture), **GoMLX** (XLA-accelerated), and **PostgreSQL** with **pgvector**. This project is packaged as a **Model Context Protocol (MCP) Server**.
+A high-performance Multimodal Retrieval-Augmented Generation (RAG) system with a deep-integrated retrieval layer. Dyna-SLM uses **T5Gemma 2** (Gemma 3 architecture) and **IBM Granite 4.0**, accelerated by **GoMLX/XLA**, and backed by **PostgreSQL** with **pgvector**.
 
 ## 🚀 Features
-- **Multimodal Embedding:** Encodes both text and images into a shared vector space (640 or 768 dimensions).
+- **Deep Integrated RAG (Embedded Layer):** Retrieval occurs *within* the model's latent space. Encoder latent states are fused with retrieved vectors via a specialized **Fusion Transformer** before decoding.
+- **Latent-to-Latent Interaction:** Bypasses the text bottleneck by retrieving and fusing raw latent vectors, ensuring higher semantic fidelity.
+- **Multimodal Support:** Encodes and reasons over both text and images (SigLIP vision encoder).
 - **Hybrid Architecture Support:** 
-  - **T5Gemma 2:** SigLIP vision encoding + Gemma 3 transformer blocks.
-  - **IBM Granite 4.0 350M-H:** Ultra-efficient Mamba-2 State Space Model (SSM) interleaved with GQA Transformer layers.
-- **GoMLX Engine:** Pure Go implementation of the model graph, accelerated by XLA (CPU/GPU/TPU).
-- **Scalable Vector Search:** High-performance similarity retrieval using pgvector HNSW indexing.
+  - **T5Gemma 2:** SigLIP + Gemma 3 transformer blocks.
+  - **IBM Granite 4.0 350M-H:** Mamba-2 SSM interleaved with GQA Transformer layers.
+- **Dynamic Model Variants:** Configure multiple model variants (different weights, architectures, dimensions) in a single instance.
+- **SQL Pre-filtering:** Custom model-level knowledge gating using SQL `WHERE` clauses (e.g., metadata filters or path restrictions).
+- **Verifiable Output:** Automatically appends source references to the generated response.
 - **Dual Interface:** 
-  - **MCP Native:** Integrated tool for AI clients (Goose, Claude, Gemini).
-  - **OpenAI Compatible:** JWT-secured REST API for seamless integration with AnythingLLM, Goose, etc.
+  - **MCP Native:** Tools for AI clients (Goose, Claude, Gemini).
+  - **OpenAI Compatible:** JWT-secured REST API (Ed25519) for AnythingLLM, Goose, etc.
 
 ## 📋 Prerequisites
 1. **Go 1.25+**
@@ -22,41 +25,37 @@ A high-performance Multimodal Retrieval-Augmented Generation (RAG) system using 
 ## ⚙️ Setup
 
 ### 1. Database Configuration
-Ensure PostgreSQL is running and initialize the schema:
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
+Ensure PostgreSQL is running. Dyna-SLM automatically initializes dimension-specific tables (e.g., `filesys_640`) based on your configuration.
 
-CREATE TABLE IF NOT EXISTS filesys (
-    path TEXT PRIMARY KEY,
-    metadata JSONB,
-    content BYTEA,
-    tmstamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    embedding vector(768)
-);
-
-CREATE INDEX ON filesys USING hnsw (embedding vector_cosine_ops);
-```
-Create a `.env` file in the root directory:
+Create a `.env` file:
 ```bash
 DATABASE_URL="postgres://user:pass@localhost:5432/dbname?sslmode=disable"
-MODEL_WEIGHTS_DIR="./models/t5gemma-2-270m"
-JWT_SECRET="your-secure-seed" # Seed for Ed25519 key generation
+JWT_SECRET="your-secure-seed" # Seed for Ed25519 key derivation
 ```
 
-### 2. Download Model Weights
-```bash
-pip install huggingface_hub
-huggingface-cli login
-python3 download_weights.py
+### 2. Model Configuration (`models.json`)
+Define your model variants in a JSON file:
+```json
+[
+  {
+    "name": "dyna-gemma3-270m",
+    "architecture": "gemma3",
+    "weights_path": "./models/t5gemma-2-270m/model.bin",
+    "embedding_dimension": 640,
+    "database_name": "filesys_640",
+    "pre_filter_sql": "path LIKE '/docs/public/%'",
+    "k": 5
+  }
+]
 ```
 
 ### 3. Build the Servers
 ```bash
 # Build the MCP Server
-CGO_ENABLED=1 go build -o mcp-server ./cmd/mcp-server
+CGO_ENABLED=1 go build -o dyna-mcp ./cmd/mcp-server
 
 # Build the OpenAI-Compatible API Server
-CGO_ENABLED=1 go build -o dyna-slm-api ./cmd/api
+CGO_ENABLED=1 go build -o dyna-api ./cmd/api
 ```
 
 ## 🛠️ Usage
@@ -64,49 +63,31 @@ CGO_ENABLED=1 go build -o dyna-slm-api ./cmd/api
 ### 1. OpenAI-Compatible API Provider
 Run the API server:
 ```bash
-./dyna-slm-api -weights ./models/t5gemma-2-270m -port 8080
+./dyna-api -config models.json -port 8080
 ```
-
-#### Authentication (JWT with EdDSA)
-The API is secured with JSON Web Tokens using the **EdDSA (Ed25519)** asymmetric algorithm.
-- The server derives a stable Ed25519 keypair from the `JWT_SECRET` (seed).
-- For testing, you can generate a token using:
-```bash
-curl http://localhost:8080/auth/token
-```
-
-#### Integration Example (Embeddings)
-```bash
-curl -X POST http://localhost:8080/v1/embeddings \
-  -H "Authorization: Bearer <TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"input": "Search query here", "model": "t5gemma-2-270m"}'
-```
+- **Authentication:** Derives a stable Ed25519 keypair from `JWT_SECRET`. Generate a test token at `GET /auth/token`.
+- **Endpoints:** Supports standard `/v1/chat/completions`, `/v1/embeddings`, and `/v1/models`.
 
 ### 2. MCP Server
-Add the following to your `goose` or `claude-desktop` configuration:
+Add to your `goose` or `claude-desktop` config:
 ```yaml
 extensions:
-  gomlx-pgvect-rag:
-    cmd: /path/to/gomlx-pgvect-rag/mcp-server
-    args: ["-weights", "/path/to/gomlx-pgvect-rag/models/t5gemma-2-270m"]
+  dyna-slm:
+    cmd: /path/to/dyna-slm/dyna-mcp
+    args: ["-config", "/path/to/models.json"]
     env:
       DATABASE_URL: "postgres://..."
 ```
 
 ### Available Tools
-- `search_multimodal`: Search for assets using a text query or a local image path.
-- `ingest_asset`: Ingest a file (image/text) to generate its embedding and store it in the database.
+- `search_multimodal`: Search assets using a text query or local image path.
+- `ingest_asset`: Ingest a file and generate its dimension-specific embedding.
+- `list_variants`: List available configured model variants.
 
-## 📂 Project Structure
-- `cmd/api/`: OpenAI-compatible HTTP server and JWT auth.
-- `cmd/mcp-server/`: Main entry point and MCP tool handlers.
-- `internal/api/`: API types, handlers, and middleware.
-- `internal/embedder/`: GoMLX implementation of SigLIP and Gemma 3 encoder blocks.
-- `internal/db/`: PostgreSQL and pgvector persistence logic.
-- `internal/gomlx_utils/`: Safetensors loading and XLA backend management.
-- `pkg/utils/`: Pure Go tokenization and JWT security utilities.
+## 📖 Documentation
+- **Architecture & Innovation:** See [DYNA_SLM_PAPER.md](./DYNA_SLM_PAPER.md) for a technical breakdown of latent retrieval vs. fine-tuning.
+- **Specification:** Detailed system design in [DYNA_SLM_SPECIFICATION.md](./DYNA_SLM_SPECIFICATION.md).
+- **Implementation Plan:** Track progress in [DYNA_SLM_IMPLEMENTATION_PLAN.md](./DYNA_SLM_IMPLEMENTATION_PLAN.md).
 
-## 📝 Troubleshooting
-- **Authentication:** If you get SASL errors, verify your `DATABASE_URL` matches your PostgreSQL `pg_hba.conf` settings (use `peer` for local Linux users).
-- **Logging:** The server redirects all status messages (e.g., "Loading weights") to `stderr` to avoid corrupting the MCP `stdout` stream.
+## 📄 License
+Licensed under the [Apache License, Version 2.0](./LICENSE).

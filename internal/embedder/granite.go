@@ -5,7 +5,6 @@ import (
 
 	. "github.com/gomlx/gomlx/pkg/core/graph"
 	"github.com/gomlx/gomlx/pkg/core/dtypes"
-	"github.com/gomlx/gomlx/pkg/core/shapes"
 	"github.com/gomlx/gomlx/pkg/ml/context"
 	"github.com/gomlx/gomlx/pkg/ml/layers"
 	"github.com/gomlx/gomlx/pkg/ml/layers/activations"
@@ -97,7 +96,7 @@ func Mamba2Block(ctx *context.Context, x *Node, cfg *GraniteHybridConfig) *Node 
 	xSSM := Slice(proj, AxisRange(), AxisRange(), AxisRange(dInner, 2*dInner))
 
 	// 3. Activation on Z
-	z = activations.Silu(z)
+	z = activations.Swish(z)
 
 	// 4. SSM Logic (Placeholder for full SSD)
 	// For this architecture implementation, we use a structured projection 
@@ -127,7 +126,7 @@ func GraniteAttentionBlock(ctx *context.Context, x *Node, cfg *GraniteHybridConf
 	x = RMSNorm(mlpCtx.In("pre_norm"), x, cfg.RMSNormEps)
 
 	gate := layers.Dense(mlpCtx.In("gate_proj"), x, false, cfg.IntermediateSize)
-	gate = activations.Silu(gate)
+	gate = activations.Swish(gate)
 	up := layers.Dense(mlpCtx.In("up_proj"), x, false, cfg.IntermediateSize)
 	intermediate := Mul(gate, up)
 	x = layers.Dense(mlpCtx.In("down_proj"), intermediate, false, cfg.HiddenSize)

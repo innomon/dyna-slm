@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/gomlx/gomlx/backends"
 	"github.com/innomon/gomlx-pgvect-rag/internal/config"
 	"github.com/innomon/gomlx-pgvect-rag/internal/db"
 	"github.com/innomon/gomlx-pgvect-rag/internal/embedder"
@@ -19,7 +20,7 @@ type Registry struct {
 }
 
 // NewRegistry initializes a Registry from the given configuration.
-func NewRegistry(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, backend *gomlx_utils.Backend) (*Registry, error) {
+func NewRegistry(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, backend backends.Backend) (*Registry, error) {
 	reg := &Registry{
 		Orchestrators: make(map[string]*Orchestrator),
 	}

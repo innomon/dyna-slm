@@ -5,37 +5,37 @@ This plan outlines the implementation steps for the Dyna-SLM architecture, trans
 ## 1. Implementation Checklist
 
 ### Phase 1: Configuration & Infrastructure
-- [ ] Define the `DynaModelConfig` struct (including `WeightsPath` and `PreFilterSQL`).
-- [ ] Implement a configuration loader for multiple model variants.
-- [ ] Refactor `internal/db` to support dynamic SQL generation with pre-filters (metadata/sub-path).
-- [ ] Refactor `internal/db` to support multiple tables/databases dynamically based on embedding dimension.
-- [ ] Update SQL schema to include dimension-specific tables (e.g., `filesys_640`, `filesys_768`).
+- [x] Define the `DynaModelConfig` struct (including `WeightsPath` and `PreFilterSQL`).
+- [x] Implement a configuration loader for multiple model variants.
+- [x] Refactor `internal/db` to support dynamic SQL generation with pre-filters (metadata/sub-path).
+- [x] Refactor `internal/db` to support multiple tables/databases dynamically based on embedding dimension.
+- [x] Update SQL schema to include dimension-specific tables (e.g., `filesys_640`, `filesys_768`).
 
 ### Phase 2: Embedded RAG Layer (GoMLX)
-- [ ] Modify `internal/embedder` to load weights from `WeightsPath` specified in the configuration.
-- [ ] Modify `internal/embedder` to expose intermediate encoder hidden states.
-- [ ] Implement the **Latent Retrieval Step**:
-    - [ ] Run the encoder graph.
-    - [ ] Extract the mean-pooled vector.
-    - [ ] Call the vector DB using the latent vector and the model-specific `PreFilterSQL`.
-- [ ] Implement the **Fusion Transformer** graph:
-    - [ ] Input: Encoder latent states + Retrieved vectors (as tokens/states).
-    - [ ] Output: Combined hidden representation.
-- [ ] Integrate the Fusion Transformer output into the decoder input.
+- [x] Modify `internal/embedder` to load weights from `WeightsPath` specified in the configuration.
+- [x] Modify `internal/embedder` to expose intermediate encoder hidden states.
+- [x] Implement the **Latent Retrieval Step**:
+    - [x] Run the encoder graph.
+    - [x] Extract the mean-pooled vector.
+    - [x] Call the vector DB using the latent vector and the model-specific `PreFilterSQL`.
+- [x] Implement the **Fusion Transformer** graph:
+    - [x] Input: Encoder latent states + Retrieved vectors (as tokens/states).
+    - [x] Output: Combined hidden representation.
+- [x] Integrate the Fusion Transformer output into the decoder input.
 
 ### Phase 3: Dynamic Model Registry
-- [ ] Implement a `ModelRegistry` that initializes and holds multiple GoMLX models (Gemma 3, Granite) based on the config file.
-- [ ] Update `internal/api` to dynamically populate `/v1/models` from the registry.
-- [ ] Update `/v1/chat/completions` to route requests to the correct model variant and perform the embedded RAG flow.
+- [x] Implement a `ModelRegistry` that initializes and holds multiple GoMLX models (Gemma 3, Granite) based on the config file.
+- [x] Update `internal/api` to dynamically populate `/v1/models` from the registry.
+- [x] Update `/v1/chat/completions` to route requests to the correct model variant and perform the embedded RAG flow.
 
 ### Phase 4: Reference Management
-- [ ] Modify the RAG orchestrator to track and return record paths through the entire pipeline.
-- [ ] Implement a "Post-Processor" that appends "References" to the final generated text.
+- [x] Modify the RAG orchestrator to track and return record paths through the entire pipeline.
+- [x] Implement a "Post-Processor" that appends "References" to the final generated text.
 
 ### Phase 5: Specialized MCP Servers
-- [ ] Create a multi-instance MCP server entry point.
-- [ ] Allow passing model configuration (encoder/dim/db) via environment variables or CLI flags.
-- [ ] Define Dyna-specific MCP tools: `dyna_search`, `dyna_ingest`, `dyna_list_variants`.
+- [x] Create a multi-instance MCP server entry point.
+- [x] Allow passing model configuration (encoder/dim/db) via environment variables or CLI flags.
+- [x] Define Dyna-specific MCP tools: `dyna_search`, `dyna_ingest`, `dyna_list_variants`.
 
 ### Phase 6: Validation & Verification
 - [ ] Create test scripts for each model variant.
@@ -92,7 +92,7 @@ $$ LANGUAGE plpgsql;
 ```
 
 ### Fusion Transformer Logic (Conceptual)
-The fusion step will likely involve a cross-attention layer where:
+The fusion step involves a cross-attention layer where:
 -   **Query:** Encoder output sequence.
 -   **Key/Value:** Retrieved vectors treated as additional context tokens.
 -   **Output:** Enhanced latent states for the decoder.

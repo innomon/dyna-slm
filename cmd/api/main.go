@@ -15,7 +15,6 @@ import (
 	"github.com/innomon/gomlx-pgvect-rag/internal/db"
 	"github.com/innomon/gomlx-pgvect-rag/internal/gomlx_utils"
 	"github.com/innomon/gomlx-pgvect-rag/internal/rag"
-	"github.com/innomon/gomlx-pgvect-rag/pkg/utils"
 
 	// Register XLA backend
 	_ "github.com/gomlx/gomlx/backends/xla"
