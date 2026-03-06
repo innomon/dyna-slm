@@ -17,8 +17,8 @@ type Asset struct {
 	Embedding []float32
 }
 
-// UpsertAsset inserts or updates an asset and its vector embedding.
-func UpsertAsset(ctx context.Context, pool *pgxpool.Pool, asset Asset) error {
+// UpsertAsset inserts or updates an asset and its vector embedding into a specific table.
+func UpsertAsset(ctx context.Context, pool *pgxpool.Pool, tableName string, asset Asset) error {
 	metaJSON, err := json.Marshal(asset.Metadata)
 	if err != nil {
 		return fmt.Errorf("failed to marshal metadata: %w", err)
@@ -26,41 +26,50 @@ func UpsertAsset(ctx context.Context, pool *pgxpool.Pool, asset Asset) error {
 
 	vec := pgvector.NewVector(asset.Embedding)
 
-	query := `
-		INSERT INTO filesys (path, metadata, content, embedding, tmstamp)
+	// Use fmt.Fprintf to build the query safely with dynamic table name (identifiers)
+	query := fmt.Sprintf(`
+		INSERT INTO %s (path, metadata, content, embedding, tmstamp)
 		VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
 		ON CONFLICT (path) DO UPDATE SET
 			metadata = EXCLUDED.metadata,
 			content = EXCLUDED.content,
 			embedding = EXCLUDED.embedding,
 			tmstamp = CURRENT_TIMESTAMP;
-	`
+	`, tableName)
 
 	_, err = pool.Exec(ctx, query, asset.Path, metaJSON, asset.Content, vec)
 	if err != nil {
-		return fmt.Errorf("failed to upsert asset: %w", err)
+		return fmt.Errorf("failed to upsert asset into %s: %w", tableName, err)
 	}
 
 	return nil
 }
 
-// SearchSimilar retrieves the top K most similar assets based on the query vector.
-func SearchSimilar(ctx context.Context, pool *pgxpool.Pool, queryVec []float32, limit int) ([]Asset, error) {
+// SearchSimilar retrieves the top K most similar assets based on the query vector, 
+// using a specific table and an optional pre-filter SQL.
+func SearchSimilar(ctx context.Context, pool *pgxpool.Pool, tableName string, preFilterSQL string, queryVec []float32, limit int) ([]Asset, error) {
 	vec := pgvector.NewVector(queryVec)
 
 	// Tuning accuracy at search time
 	_, _ = pool.Exec(ctx, "SET hnsw.ef_search = 100")
 
-	query := `
+	// Construct query with optional pre-filter
+	whereClause := ""
+	if preFilterSQL != "" {
+		whereClause = "WHERE " + preFilterSQL
+	}
+
+	query := fmt.Sprintf(`
 		SELECT path, metadata, content, (embedding <=> $1) as distance
-		FROM filesys
+		FROM %s
+		%s
 		ORDER BY distance
 		LIMIT $2;
-	`
+	`, tableName, whereClause)
 
 	rows, err := pool.Query(ctx, query, vec, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query similar assets: %w", err)
+		return nil, fmt.Errorf("failed to query similar assets from %s: %w", tableName, err)
 	}
 	defer rows.Close()
 
@@ -79,4 +88,34 @@ func SearchSimilar(ctx context.Context, pool *pgxpool.Pool, queryVec []float32, 
 	}
 
 	return assets, nil
+}
+
+// InitializeTable ensures a dimension-specific table exists with the correct HNSW index.
+func InitializeTable(ctx context.Context, pool *pgxpool.Pool, tableName string, dim int) error {
+	query := fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
+			path TEXT PRIMARY KEY,
+			metadata JSONB,
+			content BYTEA,
+			tmstamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+			embedding vector(%d)
+		);
+	`, tableName, dim)
+
+	if _, err := pool.Exec(ctx, query); err != nil {
+		return fmt.Errorf("failed to create table %s: %w", tableName, err)
+	}
+
+	indexName := fmt.Sprintf("idx_%s_embedding", tableName)
+	indexQuery := fmt.Sprintf(`
+		CREATE INDEX IF NOT EXISTS %s ON %s 
+		USING hnsw (embedding vector_cosine_ops)
+		WITH (m = 16, ef_construction = 128);
+	`, indexName, tableName)
+
+	if _, err := pool.Exec(ctx, indexQuery); err != nil {
+		return fmt.Errorf("failed to create index on %s: %w", tableName, err)
+	}
+
+	return nil
 }

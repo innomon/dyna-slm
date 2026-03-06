@@ -13,16 +13,16 @@ import (
 )
 
 type Server struct {
-	Orchestrator *rag.Orchestrator
-	PrivKey      ed25519.PrivateKey
-	PubKey       ed25519.PublicKey
+	Registry *rag.Registry
+	PrivKey  ed25519.PrivateKey
+	PubKey   ed25519.PublicKey
 }
 
-func NewServer(orch *rag.Orchestrator, privKey ed25519.PrivateKey) *Server {
+func NewServer(registry *rag.Registry, privKey ed25519.PrivateKey) *Server {
 	return &Server{
-		Orchestrator: orch,
-		PrivKey:      privKey,
-		PubKey:       privKey.Public().(ed25519.PublicKey),
+		Registry: registry,
+		PrivKey:  privKey,
+		PubKey:   privKey.Public().(ed25519.PublicKey),
 	}
 }
 
@@ -64,13 +64,20 @@ func (s *Server) HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Select the correct orchestrator from the registry
+	orch, err := s.Registry.GetOrchestrator(req.Model)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Model not found: %v", err), http.StatusNotFound)
+		return
+	}
+
 	lastMessage := ""
 	if len(req.Messages) > 0 {
 		lastMessage = req.Messages[len(req.Messages)-1].Content
 	}
 
 	// Call the actual generator
-	responseText, err := s.Orchestrator.Generate(r.Context(), lastMessage, "", 128)
+	responseText, err := orch.Generate(r.Context(), lastMessage, "", 128)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Generation failed: %v", err), http.StatusInternalServerError)
 		return
@@ -110,6 +117,13 @@ func (s *Server) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Select the correct orchestrator from the registry
+	orch, err := s.Registry.GetOrchestrator(req.Model)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Model not found: %v", err), http.StatusNotFound)
+		return
+	}
+
 	var inputs []string
 	switch v := req.Input.(type) {
 	case string:
@@ -133,19 +147,16 @@ func (s *Server) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
 
 	for i, input := range inputs {
 		// Orchestrator uses its internal GoMLX model to generate embeddings
-		// Search uses Embed internally, but we can expose a direct Embed method in Orchestrator if needed.
-		// For now, let's use the Model.Embed directly through a helper if possible or add it to Orchestrator.
-		
-		tokens, err := s.Orchestrator.Tokenizer.Encode(input, true)
+		tokens, err := orch.Tokenizer.Encode(input, true)
 		if err != nil {
 			http.Error(w, "Tokenization failed", http.StatusInternalServerError)
 			return
 		}
 		
 		// Create a zero image tensor as T5Gemma 2 is multimodal but we're doing text embedding
-		imgT := s.Orchestrator.OrchestratorZeroImageTensor()
+		imgT := orch.OrchestratorZeroImageTensor()
 
-		vec, err := s.Orchestrator.Model.Embed(tokens, imgT)
+		vec, err := orch.Model.Embed(tokens, imgT)
 		if err != nil {
 			http.Error(w, "Embedding failed", http.StatusInternalServerError)
 			return
@@ -164,16 +175,21 @@ func (s *Server) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
 
 // Handler for /v1/models
 func (s *Server) HandleModels(w http.ResponseWriter, r *http.Request) {
+	modelNames := s.Registry.ListModels()
+	modelInfos := make([]ModelInfo, 0, len(modelNames))
+	
+	for _, name := range modelNames {
+		modelInfos = append(modelInfos, ModelInfo{
+			Id:      name,
+			Object:  "model",
+			Created: time.Now().Unix(),
+			OwnedBy: "dyna-slm",
+		})
+	}
+
 	resp := ModelList{
 		Object: "list",
-		Data: []ModelInfo{
-			{
-				Id:      "t5gemma-2-270m",
-				Object:  "model",
-				Created: time.Now().Unix(),
-				OwnedBy: "gomlx-pgvect-rag",
-			},
-		},
+		Data:   modelInfos,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)

@@ -9,11 +9,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/innomon/gomlx-pgvect-rag/internal/api"
+	"github.com/innomon/gomlx-pgvect-rag/internal/config"
 	"github.com/innomon/gomlx-pgvect-rag/internal/db"
-	"github.com/innomon/gomlx-pgvect-rag/internal/embedder"
 	"github.com/innomon/gomlx-pgvect-rag/internal/gomlx_utils"
 	"github.com/innomon/gomlx-pgvect-rag/internal/rag"
 	"github.com/innomon/gomlx-pgvect-rag/pkg/utils"
@@ -23,17 +22,21 @@ import (
 )
 
 func main() {
-	var weightsDir string
+	var configPath string
 	var port int
 	var jwtSecret string
 
-	flag.StringVar(&weightsDir, "weights", os.Getenv("MODEL_WEIGHTS_DIR"), "Directory containing .safetensors weights")
+	flag.StringVar(&configPath, "config", os.Getenv("DYNA_CONFIG"), "Path to models.json configuration")
 	flag.IntVar(&port, "port", 8080, "Port to listen on")
 	flag.StringVar(&jwtSecret, "jwt-secret", os.Getenv("JWT_SECRET"), "Seed for Ed25519 key generation (default: 'dev-secret')")
 	flag.Parse()
 
 	if jwtSecret == "" {
 		jwtSecret = "dev-secret"
+	}
+
+	if configPath == "" {
+		configPath = "models.json"
 	}
 
 	// 0. Initialize Ed25519 Keys
@@ -46,35 +49,13 @@ func main() {
 		log.Fatalf("GoMLX initialization failed: %v", err)
 	}
 
-	// 2. Load Model Config, Initialize Model and Load Weights
-	configPath := filepath.Join(weightsDir, "config.json")
-	cfg, err := embedder.LoadConfig(configPath)
+	// 2. Load Dyna-SLM Configuration
+	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
-		log.Fatalf("Failed to load config from %s: %v", configPath, err)
+		log.Fatalf("Failed to load models config from %s: %v", configPath, err)
 	}
 
-	model := gomlx_utils.NewModel(backend, cfg)
-	if weightsDir != "" {
-		fmt.Fprintf(os.Stderr, "📂 Loading weights from: %s\n", weightsDir)
-		if err := model.LoadSafetensors(weightsDir); err != nil {
-			log.Fatalf("Failed to load weights: %v", err)
-		}
-		// Compile the graphs once weights are loaded
-		fmt.Fprintf(os.Stderr, "🛠️  Compiling GoMLX graphs...\n")
-		model.CompileEmbed(embedder.EmbedGraph)
-		model.CompileGenerate(embedder.GenerateGraph)
-	} else {
-		log.Fatalf("Model weights directory is required. Use -weights or MODEL_WEIGHTS_DIR.")
-	}
-
-	// 3. Initialize Tokenizer
-	tokenizerPath := filepath.Join(weightsDir, "tokenizer.json")
-	tk, err := utils.NewTokenizer(tokenizerPath)
-	if err != nil {
-		log.Fatalf("Failed to load tokenizer from %s: %v", tokenizerPath, err)
-	}
-
-	// 4. Initialize Database Connection
+	// 3. Initialize Database Connection
 	ctx := context.Background()
 	pool, err := db.Connect(ctx)
 	if err != nil {
@@ -82,15 +63,15 @@ func main() {
 	}
 	defer pool.Close()
 
-	// 5. Initialize Orchestrator
-	orchestrator := &rag.Orchestrator{
-		DB:        pool,
-		Model:     model,
-		Tokenizer: tk,
+	// 4. Initialize Model Registry
+	fmt.Fprintf(os.Stderr, "📂 Initializing Model Registry from %s...\n", configPath)
+	registry, err := rag.NewRegistry(ctx, cfg, pool, backend)
+	if err != nil {
+		log.Fatalf("Failed to initialize model registry: %v", err)
 	}
 
-	// 6. Initialize API Server
-	apiServer := api.NewServer(orchestrator, privKey)
+	// 5. Initialize API Server
+	apiServer := api.NewServer(registry, privKey)
 	mux := http.NewServeMux()
 	apiServer.RegisterHandlers(mux)
 

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "dyna-gemma3-270m",
+    "architecture": "gemma3",
+    "weights_path": "./models/t5gemma-2-270m/model.bin",
+    "embedding_dimension": 640,
+    "database_name": "filesys_640",
+    "pre_filter_sql": "path LIKE '/docs/public/%'",
+    "k": 5
+  },
+  {
+    "name": "dyna-granite-350m",
+    "architecture": "granite-hybrid",
+    "weights_path": "./models/granite-350m/model.safetensors",
+    "embedding_dimension": 768,
+    "database_name": "filesys_768",
+    "pre_filter_sql": "metadata->>'author' = 'research_team'",
+    "k": 3
+  }
+]
