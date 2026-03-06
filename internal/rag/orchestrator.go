@@ -91,6 +91,90 @@ func (o *Orchestrator) Ingest(ctx context.Context, path string, metadata map[str
 	return db.UpsertAsset(ctx, o.DB, o.Config.DatabaseName, asset)
 }
 
+// DynaGenerate implements the deep Dyna-SLM RAG flow (Encoder -> Search -> Fusion -> Decoder).
+func (o *Orchestrator) DynaGenerate(ctx context.Context, text string, imagePath string, maxTokens int) (string, error) {
+	// 1. Prepare Inputs
+	var imgT *tensors.Tensor
+	var err error
+	if imagePath != "" {
+		imgT, err = embedder.LoadImageAsTensor(imagePath)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		imgT = o.OrchestratorZeroImageTensor()
+	}
+
+	tokens, err := o.Tokenizer.Encode(text, true)
+	if err != nil {
+		return "", err
+	}
+
+	// 2. Encoder Stage (Returns pooled vector and full hidden states)
+	pooledVec, encoderHiddenStates, err := o.Model.DynaEncode(tokens, imgT)
+	if err != nil {
+		return "", fmt.Errorf("dyna encode failed: %w", err)
+	}
+
+	// 3. Search Stage (Retrieves vectors based on pooled latent representation)
+	k := o.Config.K
+	if k <= 0 {
+		k = 3
+	}
+	results, err := db.SearchSimilar(ctx, o.DB, o.Config.DatabaseName, o.Config.PreFilterSQL, pooledVec, k)
+	if err != nil {
+		return "", fmt.Errorf("search failed during dyna generate: %w", err)
+	}
+
+	// 4. Prepare Retrieved Vectors as Tensor for Fusion [batch=1, k, hidden_dim]
+	var allVecs []float32
+	var actualK int
+	var references []string
+	for _, res := range results {
+		allVecs = append(allVecs, res.Embedding...)
+		references = append(references, res.Path)
+		actualK++
+	}
+	
+	// Handle case where fewer than k results were found
+	if actualK == 0 {
+		// Provide zero vectors if none found to satisfy fusion transformer shape
+		allVecs = make([]float32, o.Config.EmbeddingDimension)
+		actualK = 1
+	}
+	
+	retrievedT := tensors.FromFlatDataAndDimensions(allVecs, 1, actualK, o.Config.EmbeddingDimension)
+
+	// 5. Generation Stage (Fusion + Decoder Step-by-Step)
+	decoderIds := []uint32{2} // BOS token
+	
+	for i := 0; i < maxTokens; i++ {
+		nextId, err := o.Model.DynaFusionStep(encoderHiddenStates, retrievedT, decoderIds)
+		if err != nil {
+			return "", err
+		}
+
+		if nextId == 1 { // EOS token
+			break
+		}
+
+		decoderIds = append(decoderIds, nextId)
+	}
+
+	// 6. Decode response
+	response, err := o.Tokenizer.Decode(decoderIds[1:], true) // Skip BOS
+	if err != nil {
+		return "", err
+	}
+
+	// 7. Append References
+	if len(references) > 0 {
+		response += "\n\nReferences:\n- " + strings.Join(references, "\n- ")
+	}
+
+	return response, nil
+}
+
 // Generate uses the model's decoder to produce a response, augmented by RAG context.
 func (o *Orchestrator) Generate(ctx context.Context, text string, imagePath string, maxTokens int) (string, error) {
 	// 1. RAG: Search for context using model's K value

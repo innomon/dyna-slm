@@ -79,6 +79,36 @@ func DecoderBlock(ctx *context.Context, x, encoderStates *Node, numHeads, numKVH
 	return x
 }
 
+// FusionTransformer integrates encoder latent states with retrieved vectors.
+func FusionTransformer(ctx *context.Context, encoderStates, retrievedVectors *Node, cfg *SubConfig) *Node {
+	ctx = ctx.In("fusion_transformer")
+	
+	// retrievedVectors: [batch, k, hidden_dim]
+	// encoderStates: [batch, seq_len, hidden_dim]
+	
+	// Treat retrieved vectors as additional context tokens for cross-attention
+	for i := 0; i < 2; i++ { // 2 layers of fusion for depth
+		layerCtx := ctx.In(fmt.Sprintf("%d", i))
+		
+		// 1. Self-Attention on encoder states
+		normX := RMSNorm(layerCtx.In("pre_self_attention_norm"), encoderStates, 1e-6)
+		selfAttn := MultiHeadAttention(layerCtx.In("self_attn"), normX, cfg.NumAttentionHeads, cfg.NumKeyValueHeads, cfg.HeadDim, cfg.SlidingWindow, 10000.0, false)
+		encoderStates = Add(encoderStates, selfAttn)
+		
+		// 2. Cross-Attention with retrieved vectors
+		normX = RMSNorm(layerCtx.In("pre_cross_attention_norm"), encoderStates, 1e-6)
+		crossAttn := CrossAttention(layerCtx.In("cross_attn"), normX, retrievedVectors, cfg.NumAttentionHeads, cfg.HeadDim)
+		encoderStates = Add(encoderStates, crossAttn)
+		
+		// 3. MLP
+		normX = RMSNorm(layerCtx.In("pre_mlp_norm"), encoderStates, 1e-6)
+		mlpOut := MLP(layerCtx.In("mlp"), normX, cfg.IntermediateSize)
+		encoderStates = Add(encoderStates, mlpOut)
+	}
+	
+	return encoderStates
+}
+
 // Gemma3Encoder assembles transformer layers based on SubConfig.
 func Gemma3Encoder(ctx *context.Context, x *Node, cfg *SubConfig) *Node {
 	ctx = ctx.In("gemma3_encoder")

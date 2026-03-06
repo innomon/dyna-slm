@@ -76,8 +76,8 @@ func (s *Server) HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		lastMessage = req.Messages[len(req.Messages)-1].Content
 	}
 
-	// Call the actual generator
-	responseText, err := orch.Generate(r.Context(), lastMessage, "", 128)
+	// Call the actual dyna generator (Embedded RAG)
+	responseText, err := orch.DynaGenerate(r.Context(), lastMessage, "", 128)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Generation failed: %v", err), http.StatusInternalServerError)
 		return

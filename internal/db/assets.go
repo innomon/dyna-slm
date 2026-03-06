@@ -60,7 +60,7 @@ func SearchSimilar(ctx context.Context, pool *pgxpool.Pool, tableName string, pr
 	}
 
 	query := fmt.Sprintf(`
-		SELECT path, metadata, content, (embedding <=> $1) as distance
+		SELECT path, metadata, content, embedding, (embedding <=> $1) as distance
 		FROM %s
 		%s
 		ORDER BY distance
@@ -78,9 +78,11 @@ func SearchSimilar(ctx context.Context, pool *pgxpool.Pool, tableName string, pr
 		var a Asset
 		var metaRaw []byte
 		var distance float64
-		if err := rows.Scan(&a.Path, &metaRaw, &a.Content, &distance); err != nil {
+		var pgVec pgvector.Vector
+		if err := rows.Scan(&a.Path, &metaRaw, &a.Content, &pgVec, &distance); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
+		a.Embedding = pgVec.Slice()
 		if err := json.Unmarshal(metaRaw, &a.Metadata); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
 		}

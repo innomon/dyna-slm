@@ -48,6 +48,8 @@ func NewRegistry(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, ba
 		// 4. Compile Graphs
 		model.CompileEmbed(embedder.EmbedGraph)
 		model.CompileGenerate(embedder.GenerateGraph)
+		model.CompileDynaEncoder(embedder.DynaEncoderGraph)
+		model.CompileDynaFusionDecoder(embedder.DynaFusionDecoderGraph)
 
 		// 5. Load Tokenizer
 		tokenizerPath := filepath.Join(filepath.Dir(mCfg.WeightsPath), "tokenizer.json")

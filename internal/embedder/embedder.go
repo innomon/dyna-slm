@@ -41,6 +41,47 @@ func EmbedMultimodalGraph(ctx *context.Context, textIds, imagePixels *Node, cfg 
 	return MeanPoolingGraph(ctx, encoderHiddenStates)
 }
 
+// DynaEncoderGraph returns (pooled_embedding, encoder_hidden_states).
+func DynaEncoderGraph(ctx *context.Context, textIds, imagePixels *Node, cfg *Config) []*Node {
+	// 1-5. Preprocess and Concatenate (Same as EmbedMultimodalGraph)
+	normImages := PreprocessImageGraph(ctx, imagePixels)
+	visualTokens := SigLIPVisionEncoder(ctx, normImages, cfg.Encoder.VisionConfig)
+	
+	ctxVisionProj := ctx.In("vision_projection")
+	visualTokens = layers.Dense(ctxVisionProj, visualTokens, true, cfg.Encoder.TextConfig.HiddenSize)
+	
+	textCtx := ctx.In("text_embedding")
+	textTokens := layers.Embedding(textCtx, textIds, dtypes.Float32, cfg.VocabSize, cfg.Encoder.TextConfig.HiddenSize)
+	
+	combinedTokens := Concatenate([]*Node{visualTokens, textTokens}, 1)
+
+	// 6. Gemma 3 Multimodal Encoder
+	encoderHiddenStates := Gemma3Encoder(ctx, combinedTokens, cfg.Encoder.TextConfig)
+
+	// 7. Mean Pooling for search vector
+	pooled := MeanPoolingGraph(ctx, encoderHiddenStates)
+	
+	return []*Node{pooled, encoderHiddenStates}
+}
+
+// DynaFusionDecoderGraph builds the graph for Fusion + Decoding.
+func DynaFusionDecoderGraph(ctx *context.Context, encoderHiddenStates, retrievedVectors, decoderIds *Node, cfg *Config) *Node {
+	// 1. Fusion Transformer (Encoder States + Retrieved Vectors)
+	fusedStates := FusionTransformer(ctx, encoderHiddenStates, retrievedVectors, cfg.Encoder.TextConfig)
+	
+	// 2. Decoder Text Embedding
+	decoderTextCtx := ctx.In("decoder_text_embedding")
+	decoderTokens := layers.Embedding(decoderTextCtx, decoderIds, dtypes.Float32, cfg.VocabSize, cfg.Decoder.HiddenSize)
+
+	// 3. Gemma 3 Decoder
+	decoderHiddenStates := Gemma3Decoder(ctx, decoderTokens, fusedStates, cfg.Decoder)
+
+	// 4. Output Head
+	textCtx := ctx.In("text_embedding") // Tie weights if needed
+	logits := layers.Dense(textCtx, decoderHiddenStates, false, cfg.VocabSize)
+	return logits
+}
+
 // GenerateGraph builds the GoMLX graph for generation, dispatching based on model type.
 func GenerateGraph(ctx *context.Context, textIds, imagePixels, decoderIds *Node, cfg *Config) *Node {
 	if cfg.ModelType == "granite-hybrid" {

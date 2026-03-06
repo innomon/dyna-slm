@@ -33,11 +33,13 @@ func InitializeBackend() (backends.Backend, error) {
 
 // Model represents the T5Gemma 2 model context and weights.
 type Model struct {
-	Backend      backends.Backend
-	Context      *context.Context
-	Config       *embedder.Config
-	ExecEmbed    *graph.Exec
-	ExecGenerate *graph.Exec
+	Backend                backends.Backend
+	Context                *context.Context
+	Config                 *embedder.Config
+	ExecEmbed              *graph.Exec
+	ExecGenerate           *graph.Exec
+	ExecDynaEncoder        *graph.Exec
+	ExecDynaFusionDecoder  *graph.Exec
 }
 
 // NewModel initializes the GoMLX context.
@@ -61,6 +63,80 @@ func (m *Model) CompileGenerate(buildFn func(ctx *context.Context, textIds, imag
 	m.ExecGenerate = graph.MustNewExec(m.Backend, func(textIds, imagePixels, decoderIds *graph.Node) *graph.Node {
 		return buildFn(m.Context, textIds, imagePixels, decoderIds, m.Config)
 	})
+}
+
+// CompileDynaEncoder compiles the Dyna-SLM encoder graph.
+func (m *Model) CompileDynaEncoder(buildFn func(ctx *context.Context, textIds, imagePixels *graph.Node, cfg *embedder.Config) []*graph.Node) {
+	m.ExecDynaEncoder = graph.MustNewExec(m.Backend, func(textIds, imagePixels *graph.Node) []*graph.Node {
+		return buildFn(m.Context, textIds, imagePixels, m.Config)
+	})
+}
+
+// CompileDynaFusionDecoder compiles the Dyna-SLM fusion+decoder graph.
+func (m *Model) CompileDynaFusionDecoder(buildFn func(ctx *context.Context, encoderHiddenStates, retrievedVectors, decoderIds *graph.Node, cfg *embedder.Config) *graph.Node) {
+	m.ExecDynaFusionDecoder = graph.MustNewExec(m.Backend, func(encoderHiddenStates, retrievedVectors, decoderIds *graph.Node) *graph.Node {
+		return buildFn(m.Context, encoderHiddenStates, retrievedVectors, decoderIds, m.Config)
+	})
+}
+
+// DynaEncode executes the Dyna-SLM encoder graph.
+func (m *Model) DynaEncode(textIds []uint32, imageTensor *tensors.Tensor) ([]float32, *tensors.Tensor, error) {
+	if m.ExecDynaEncoder == nil {
+		return nil, nil, fmt.Errorf("dyna encoder graph not compiled")
+	}
+
+	textT := tensors.FromFlatDataAndDimensions(textIds, 1, len(textIds))
+	results := m.ExecDynaEncoder.MustExec(textT, imageTensor)
+	
+	pooledT := results[0]
+	hiddenT := results[1]
+	
+	pooledData := pooledT.Value()
+	var pooledVec []float32
+	switch v := pooledData.(type) {
+	case [][]float32:
+		pooledVec = v[0]
+	case []float32:
+		pooledVec = v
+	default:
+		return nil, nil, fmt.Errorf("unexpected pooled tensor type: %T", pooledData)
+	}
+	
+	return pooledVec, hiddenT, nil
+}
+
+// DynaFusionStep executes one step of the Dyna-SLM fusion+decoder graph.
+func (m *Model) DynaFusionStep(encoderHiddenStates, retrievedVectors *tensors.Tensor, decoderIds []uint32) (uint32, error) {
+	if m.ExecDynaFusionDecoder == nil {
+		return 0, fmt.Errorf("dyna fusion decoder graph not compiled")
+	}
+
+	decoderT := tensors.FromFlatDataAndDimensions(decoderIds, 1, len(decoderIds))
+	results := m.ExecDynaFusionDecoder.MustExec(encoderHiddenStates, retrievedVectors, decoderT)
+	
+	outT := results[0]
+	data := outT.Value()
+	
+	var logits []float32
+	switch v := data.(type) {
+	case [][][]float32: // [batch][seq][vocab]
+		batch := v[0]
+		logits = batch[len(batch)-1]
+	default:
+		return 0, fmt.Errorf("unexpected logits tensor type: %T", data)
+	}
+
+	// Greedy: find max logit
+	var maxIdx uint32
+	var maxVal float32 = -1e10
+	for i, val := range logits {
+		if val > maxVal {
+			maxVal = val
+			maxIdx = uint32(i)
+		}
+	}
+
+	return maxIdx, nil
 }
 
 // Embed executes the compiled GoMLX graph.
