@@ -34,7 +34,12 @@ JWT_SECRET="your-secure-seed" # Seed for Ed25519 key derivation
 ```
 
 ### 2. Model Configuration (`models.json`)
-Define your model variants in a JSON file:
+Dyna-SLM uses a two-tier configuration system to avoid hardcoding model parameters:
+
+- **Global Registry (`models.json`)**: Defines the high-level metadata for each model instance, including its name, architecture type (`gemma3` or `granite-hybrid`), weights path, and database table mapping.
+- **Architecture Config (`config.json`)**: Located in each model's `weights_path` directory. This file contains the precise structural parameters (e.g., `hidden_size`, `num_hidden_layers`, `vocab_size`, etc.). Dyna-SLM dynamically loads these at runtime to build the GoMLX computation graph.
+
+Example `models.json`:
 ```json
 [
   {
