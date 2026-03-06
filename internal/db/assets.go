@@ -121,3 +121,44 @@ func InitializeTable(ctx context.Context, pool *pgxpool.Pool, tableName string, 
 
 	return nil
 }
+
+// GetAssetCount returns the total number of assets in a specific table.
+func GetAssetCount(ctx context.Context, pool *pgxpool.Pool, tableName string) (int, error) {
+	var count int
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)
+	err := pool.QueryRow(ctx, query).Scan(&count)
+	return count, err
+}
+
+// GetAllAssets retrieves all assets from a specific table, using pagination.
+func GetAllAssets(ctx context.Context, pool *pgxpool.Pool, tableName string, limit, offset int) ([]Asset, error) {
+	query := fmt.Sprintf(`
+		SELECT path, metadata, content, embedding
+		FROM %s
+		ORDER BY path
+		LIMIT $1 OFFSET $2;
+	`, tableName)
+
+	rows, err := pool.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all assets from %s: %w", tableName, err)
+	}
+	defer rows.Close()
+
+	var assets []Asset
+	for rows.Next() {
+		var a Asset
+		var metaRaw []byte
+		var pgVec pgvector.Vector
+		if err := rows.Scan(&a.Path, &metaRaw, &a.Content, &pgVec); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		a.Embedding = pgVec.Slice()
+		if err := json.Unmarshal(metaRaw, &a.Metadata); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal metadata: %w", err)
+		}
+		assets = append(assets, a)
+	}
+
+	return assets, nil
+}

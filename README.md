@@ -11,6 +11,7 @@ A high-performance Multimodal Retrieval-Augmented Generation (RAG) system with a
   - **IBM Granite 4.0 350M-H:** Mamba-2 SSM interleaved with GQA Transformer layers.
 - **Dynamic Model Variants:** Configure multiple model variants (different weights, architectures, dimensions) in a single instance.
 - **SQL Pre-filtering:** Custom model-level knowledge gating using SQL `WHERE` clauses (e.g., metadata filters or path restrictions).
+- **Architecture Migration:** Easily migrate embeddings between different model architectures or update metadata in bulk using the `db-migrate` utility.
 - **Verifiable Output:** Automatically appends source references to the generated response.
 - **Dual Interface:** 
   - **MCP Native:** Tools for AI clients (Goose, Claude, Gemini).
@@ -54,14 +55,22 @@ Example `models.json`:
 ]
 ```
 
-### 3. Build the Servers
-```bash
-# Build the MCP Server
-CGO_ENABLED=1 go build -o dyna-mcp ./cmd/mcp-server
+### 3. Database Migration Utility (`db-migrate`)
+If you switch models or update an existing model's architecture, you can migrate your existing database records to the new embedding format:
 
-# Build the OpenAI-Compatible API Server
-CGO_ENABLED=1 go build -o dyna-api ./cmd/api
+```bash
+# Build the migration utility
+CGO_ENABLED=1 go build -o db-migrate ./cmd/db-migrate
+
+# Run migration
+./db-migrate \
+  -config models.json \
+  -source dyna-gemma3-270m \
+  -target dyna-granite-350m \
+  -add-meta "migrated_from:gemma3,version:2.0" \
+  -remove-meta "old_tag"
 ```
+The utility re-embeds all assets (images and text) using the target model and applies the requested metadata transformations.
 
 ## 🛠️ Usage
 

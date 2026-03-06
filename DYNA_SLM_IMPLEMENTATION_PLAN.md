@@ -38,10 +38,11 @@ This plan outlines the implementation steps for the Dyna-SLM architecture, trans
 - [x] Define Dyna-specific MCP tools: `dyna_search`, `dyna_ingest`, `dyna_list_variants`.
 
 ### Phase 6: Validation & Verification
-- [ ] Create test scripts for each model variant.
-- [ ] Verify that embeddings from the encoder correctly retrieve relevant records from their respective dimension-specific tables.
-- [ ] Verify the "References" section in the chat output.
-- [ ] Benchmark latency of the embedded RAG layer versus standard RAG.
+- [x] Create test scripts for each model variant (see `internal/db/db_test.go`).
+- [x] Verify that embeddings from the encoder correctly retrieve relevant records from their respective dimension-specific tables.
+- [x] Verify the "References" section in the chat output.
+- [x] Benchmark latency of the embedded RAG layer versus standard RAG.
+- [x] Implement `db-migrate` for cross-architecture re-embedding.
 
 ## 2. Step-by-Step Details
 

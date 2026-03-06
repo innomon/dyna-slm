@@ -30,7 +30,14 @@ Each model is defined by:
 ### 2.2. Vector Database Strategy
 -   **Dimension-Specific Storage:** Databases are partitioned by embedding dimension to ensure compatibility between the model's latent space and the stored vectors.
 -   **Algorithm Alignment:** Each database is optimized for the specific embedding algorithm used by its corresponding encoder.
--   **Filtered Search:** The retrieval step applies the **Pre-filter SQL** to the `filesys` table (filtering by metadata or sub-path) before executing the vector similarity search (`<=>`). This allows model customizers to restrict the knowledge base for specific model variants.
+- **Filtered Search:** The retrieval step applies the **Pre-filter SQL** to the `filesys` table (filtering by metadata or sub-path) before executing the vector similarity search (`<=>`). This allows model customizers to restrict the knowledge base for specific model variants.
+
+### 2.3. Migration and Re-embedding
+Dyna-SLM includes a migration utility to support architecture transitions:
+-   **Model Switching:** When moving from one model (e.g., Gemma 3) to another (e.g., Granite), the system re-embeds all assets using the target model's encoder.
+-   **Metadata Modification:** Allows bulk addition or removal of JSONB metadata fields during migration.
+-   **Batch Processing:** Uses paginated retrieval to migrate large datasets efficiently.
+
 
 ## 3. MCP Server Integration
 

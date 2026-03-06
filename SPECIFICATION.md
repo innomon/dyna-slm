@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS filesys (
     metadata JSONB,
     content BYTEA,
     tmstamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    embedding vector(768) -- Support for Granite 4.0 350M-H (768-dim) or T5Gemma 2 (640-dim)
+    embedding vector(640) -- Support for T5Gemma 2 (640-dim) or Granite 4.0 350M-H (768-dim)
 );
 
 -- Index metadata
@@ -56,6 +56,7 @@ The system is packaged as an **MCP Server**, exposing tools for ingestion and se
 - **`search_multimodal`**: Search using `query_text` or `query_image_path`.
 - **`ingest_asset`**: Ingest a local file, generate a 640-dim embedding, and UPSERT into PG.
 - **`get_asset_details`**: Retrieve full metadata/content for a specific path.
+- **`db_migrate`**: (CLI Utility) Re-embed assets for architecture migration and metadata updates.
 
 ## 5. Deployment Considerations
 - **Attention:** Implements alternating sliding window (512 tokens) and full attention (every 6th layer).

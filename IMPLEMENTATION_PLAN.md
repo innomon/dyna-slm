@@ -16,7 +16,7 @@ This plan outlines the steps for building the T5Gemma 2 multimodal RAG system.
   - `go get github.com/modelcontextprotocol/go-sdk/mcp`
 
 ### Phase 2: Database Schema (PostgreSQL)
-- [x] Create `filesys` table with `path` (PK), `metadata` (JSONB), `content` (BYTEA), `embedding` (vector(1152)).
+- [x] Create `filesys` table with `path` (PK), `metadata` (JSONB), `content` (BYTEA), `embedding` (vector(640)).
 - [x] Create GIN index for metadata.
 - [x] Create HNSW index for embeddings with `vector_cosine_ops`.
 - [x] Implement `internal/db/upsert.go` with `ON CONFLICT` support for the `filesys` table.
@@ -60,8 +60,13 @@ This plan outlines the steps for building the T5Gemma 2 multimodal RAG system.
 - [x] Update `internal/embedder/config.go` with `GraniteHybridConfig`.
 - [x] Implement dispatcher in `internal/embedder/embedder.go`.
 - [x] Update API and MCP main entry points to support both models.
-- [ ] Verify 768-dimension embedding output.
-- [ ] Performance benchmarking for hybrid inference.
+- [x] Verify 768-dimension embedding output.
+- [x] Performance benchmarking for hybrid inference.
+
+### Phase 9: Database & Migration Utilities
+- [x] Implement `db-migrate` utility for re-embedding assets between models.
+- [x] Add support for batch metadata modifications during migration.
+- [x] Implement paginated database retrieval for large-scale migrations.
 
 ## Step-by-Step Details
 
