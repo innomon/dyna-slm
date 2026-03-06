@@ -23,6 +23,31 @@ type Config struct {
 	
 	Decoder             *SubConfig    `json:"decoder"`
 	Encoder             *EncoderConfig `json:"encoder"`
+
+	// Granite Hybrid specific config
+	GraniteHybrid       *GraniteHybridConfig `json:"granite_hybrid"`
+}
+
+type GraniteHybridConfig struct {
+	VocabSize           int      `json:"vocab_size"`
+	HiddenSize          int      `json:"hidden_size"`
+	NumHiddenLayers     int      `json:"num_hidden_layers"`
+	LayerTypes          []string `json:"layer_types"` // "mamba" or "attention"
+	RMSNormEps          float64  `json:"rms_norm_eps"`
+	
+	// Attention params
+	NumAttentionHeads   int      `json:"num_attention_heads"`
+	NumKeyValueHeads    int      `json:"num_key_value_heads"`
+	IntermediateSize    int      `json:"intermediate_size"`
+	RoPETheta           float64  `json:"rope_theta"`
+
+	// Mamba2 params
+	MambaStateDim       int      `json:"mamba_state_dim"`
+	MambaConvKernel     int      `json:"mamba_conv_kernel"`
+	MambaExpand         int      `json:"mamba_expand"`
+	MambaHeads          int      `json:"mamba_heads"`
+	MambaHeadDim        int      `json:"mamba_head_dim"`
+	MambaChunkSize      int      `json:"mamba_chunk_size"`
 }
 
 type SubConfig struct {

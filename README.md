@@ -3,8 +3,10 @@
 A high-performance Multimodal Retrieval-Augmented Generation (RAG) system using **T5Gemma 2** (based on the **Gemma 3** architecture), **GoMLX** (XLA-accelerated), and **PostgreSQL** with **pgvector**. This project is packaged as a **Model Context Protocol (MCP) Server**.
 
 ## 🚀 Features
-- **Multimodal Embedding:** Encodes both text and images into a shared 640-dimension vector space.
-- **State-of-the-Art Architecture:** Leverages SigLIP vision encoding and Gemma 3 transformer blocks.
+- **Multimodal Embedding:** Encodes both text and images into a shared vector space (640 or 768 dimensions).
+- **Hybrid Architecture Support:** 
+  - **T5Gemma 2:** SigLIP vision encoding + Gemma 3 transformer blocks.
+  - **IBM Granite 4.0 350M-H:** Ultra-efficient Mamba-2 State Space Model (SSM) interleaved with GQA Transformer layers.
 - **GoMLX Engine:** Pure Go implementation of the model graph, accelerated by XLA (CPU/GPU/TPU).
 - **Scalable Vector Search:** High-performance similarity retrieval using pgvector HNSW indexing.
 - **Dual Interface:** 
@@ -29,7 +31,7 @@ CREATE TABLE IF NOT EXISTS filesys (
     metadata JSONB,
     content BYTEA,
     tmstamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    embedding vector(640)
+    embedding vector(768)
 );
 
 CREATE INDEX ON filesys USING hnsw (embedding vector_cosine_ops);

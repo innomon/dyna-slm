@@ -8,11 +8,16 @@ A Multimodal Retrieval-Augmented Generation (RAG) system built with:
 - **ML Engine:** [GoMLX](https://github.com/gomlx/gomlx) (XLA-accelerated)
 - **MCP Server** [Official go MCP SDK](https://github.com/modelcontextprotocol/go-sdk)
 - **Vector Database:** PostgreSQL with [pgvector](https://github.com/pgvector/pgvector)
-- **Models:** T5Gemma 2 (Multimodal Encoder-Decoder)
-  - **Foundation:** Based on **Gemma 3** architecture (UL2 adaptation).
-  - **Encoder:** SigLIP Vision Encoder (1152-dim) + Gemma 3 Text Encoder (640-dim).
-  - **Decoder:** Gemma 3 for generation.
-  - **Embedding Dimension:** 640 (based on Gemma 3 text encoder hidden size).
+- **Models:** 
+  - **T5Gemma 2 (Multimodal Encoder-Decoder):**
+    - **Foundation:** Based on **Gemma 3** architecture (UL2 adaptation).
+    - **Encoder:** SigLIP Vision Encoder (1152-dim) + Gemma 3 Text Encoder (640-dim).
+    - **Decoder:** Gemma 3 for generation.
+    - **Embedding Dimension:** 640 (based on Gemma 3 text encoder hidden size).
+  - **IBM Granite 4.0 350M-H (Hybrid SSM/Transformer):**
+    - **Architecture:** Hybrid Mamba-2 (SSM) and Transformer (GQA).
+    - **Layers:** 32 layers (28 Mamba-2, 4 Attention).
+    - **Embedding Dimension:** 768.
 
 ## Engineering Standards
 - **Go Conventions:** Standard directory structure (`cmd/`, `internal/`, `pkg/`).

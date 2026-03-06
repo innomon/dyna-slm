@@ -54,6 +54,15 @@ This plan outlines the steps for building the T5Gemma 2 multimodal RAG system.
 - [x] Implement actual Gemma 2 decoder for `/v1/chat/completions`.
 - [ ] Add integration tests for OpenAI-compatible endpoints.
 
+### Phase 8: IBM Granite 4.0 350M-H Integration
+- [x] Research Granite 4.0 Hybrid (Mamba-2 + Transformer) architecture.
+- [x] Implement `internal/embedder/granite.go` with hybrid layer support.
+- [x] Update `internal/embedder/config.go` with `GraniteHybridConfig`.
+- [x] Implement dispatcher in `internal/embedder/embedder.go`.
+- [x] Update API and MCP main entry points to support both models.
+- [ ] Verify 768-dimension embedding output.
+- [ ] Performance benchmarking for hybrid inference.
+
 ## Step-by-Step Details
 
 ### DB Creation SQL

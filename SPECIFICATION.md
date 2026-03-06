@@ -4,10 +4,14 @@ This document details the architecture for the T5Gemma 2 RAG system, based on th
 
 ## 1. Technical Stack
 - **ML Framework:** GoMLX (XLA-accelerated model inference).
-- **Models:** T5Gemma 2-270M (based on Gemma 3 architecture).
-  - Vision Encoder: SigLIP (896x896 input, 256 tokens).
-  - Text Encoder: Gemma 3 (UL2 adaptation).
-  - Generative Decoder: Gemma 3.
+- **Models:**
+  - **T5Gemma 2-270M** (based on Gemma 3 architecture).
+    - Vision Encoder: SigLIP (896x896 input, 256 tokens).
+    - Text Encoder: Gemma 3 (UL2 adaptation).
+    - Generative Decoder: Gemma 3.
+  - **IBM Granite 4.0 350M-H** (Hybrid SSM/Transformer).
+    - Architecture: Hybrid Mamba-2 + Transformer (GQA).
+    - Embedding Dimension: 768.
 - **Database:** PostgreSQL + `pgvector`.
 - **Drivers:** `pgx/v5`, `pgvector-go`.
 
@@ -33,7 +37,7 @@ CREATE TABLE IF NOT EXISTS filesys (
     metadata JSONB,
     content BYTEA,
     tmstamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    embedding vector(640) -- For T5Gemma 2-270M (Gemma 3 base)
+    embedding vector(768) -- Support for Granite 4.0 350M-H (768-dim) or T5Gemma 2 (640-dim)
 );
 
 -- Index metadata

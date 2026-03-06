@@ -61,8 +61,8 @@ func main() {
 		}
 		// Compile the graphs once weights are loaded
 		fmt.Fprintf(os.Stderr, "🛠️  Compiling GoMLX graphs...\n")
-		model.CompileEmbed(embedder.EmbedMultimodalGraph)
-		model.CompileGenerate(embedder.GenerateMultimodalGraph)
+		model.CompileEmbed(embedder.EmbedGraph)
+		model.CompileGenerate(embedder.GenerateGraph)
 	} else {
 		log.Fatalf("Model weights directory is required. Use -weights or MODEL_WEIGHTS_DIR.")
 	}

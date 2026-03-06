@@ -7,6 +7,14 @@ import (
 	"github.com/gomlx/gomlx/pkg/ml/layers"
 )
 
+// EmbedGraph builds the GoMLX graph for encoding, dispatching to the correct model type.
+func EmbedGraph(ctx *context.Context, textIds, imagePixels *Node, cfg *Config) *Node {
+	if cfg.ModelType == "granite-hybrid" {
+		return GraniteHybridEmbedderGraph(ctx, textIds, cfg)
+	}
+	return EmbedMultimodalGraph(ctx, textIds, imagePixels, cfg)
+}
+
 // EmbedMultimodalGraph builds the full GoMLX graph for text+image encoding.
 func EmbedMultimodalGraph(ctx *context.Context, textIds, imagePixels *Node, cfg *Config) *Node {
 	// 1. Preprocess Images
@@ -31,6 +39,14 @@ func EmbedMultimodalGraph(ctx *context.Context, textIds, imagePixels *Node, cfg 
 
 	// 7. Mean Pooling
 	return MeanPoolingGraph(ctx, encoderHiddenStates)
+}
+
+// GenerateGraph builds the GoMLX graph for generation, dispatching based on model type.
+func GenerateGraph(ctx *context.Context, textIds, imagePixels, decoderIds *Node, cfg *Config) *Node {
+	if cfg.ModelType == "granite-hybrid" {
+		return GraniteHybridGenerateGraph(ctx, textIds, decoderIds, cfg)
+	}
+	return GenerateMultimodalGraph(ctx, textIds, imagePixels, decoderIds, cfg)
 }
 
 // GenerateMultimodalGraph builds the full GoMLX graph for text+image conditional generation.
