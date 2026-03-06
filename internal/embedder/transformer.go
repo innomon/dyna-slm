@@ -34,16 +34,45 @@ func MLP(ctx *context.Context, x *Node, intermediateDim int) *Node {
 }
 
 // MultiHeadAttention implements the Gemma 3 attention mechanism.
-func MultiHeadAttention(ctx *context.Context, x *Node, numHeads, numKVHeads, headDim, slidingWindow int, ropeTheta float64) *Node {
+func MultiHeadAttention(ctx *context.Context, x *Node, numHeads, numKVHeads, headDim, slidingWindow int, ropeTheta float64, mask *Node) *Node {
 	ctx = ctx.In("attention")
-	return layers.MultiHeadAttention(ctx, x, x, x, numHeads, numHeads*headDim).Done()
+	mha := layers.MultiHeadAttention(ctx, x, x, x, numHeads, numHeads*headDim)
+	if mask != nil {
+		mha.SetMask(mask)
+	}
+	return mha.Done()
+}
+
+// CrossAttention implements the attention mechanism between decoder and encoder.
+func CrossAttention(ctx *context.Context, x, encoderStates *Node, numHeads, headDim int) *Node {
+	ctx = ctx.In("cross_attention")
+	return layers.MultiHeadAttention(ctx, x, encoderStates, encoderStates, numHeads, numHeads*headDim).Done()
 }
 
 // EncoderBlock represents a single Gemma 3 transformer layer.
 func EncoderBlock(ctx *context.Context, x *Node, numHeads, numKVHeads, headDim, intermediateDim, slidingWindow int, ropeTheta float64) *Node {
 	normX := RMSNorm(ctx.In("pre_attention_norm"), x, 1e-6)
-	attn := MultiHeadAttention(ctx, normX, numHeads, numKVHeads, headDim, slidingWindow, ropeTheta)
+	attn := MultiHeadAttention(ctx, normX, numHeads, numKVHeads, headDim, slidingWindow, ropeTheta, nil)
 	x = Add(x, attn)
+	normX = RMSNorm(ctx.In("pre_mlp_norm"), x, 1e-6)
+	mlpOut := MLP(ctx, normX, intermediateDim)
+	x = Add(x, mlpOut)
+	return x
+}
+
+// DecoderBlock represents a single T5Gemma 2 decoder layer.
+func DecoderBlock(ctx *context.Context, x, encoderStates *Node, numHeads, numKVHeads, headDim, intermediateDim, slidingWindow int, ropeTheta float64, selfMask *Node) *Node {
+	// 1. Self-Attention (Causal)
+	normX := RMSNorm(ctx.In("pre_self_attention_norm"), x, 1e-6)
+	selfAttn := MultiHeadAttention(ctx, normX, numHeads, numKVHeads, headDim, slidingWindow, ropeTheta, selfMask)
+	x = Add(x, selfAttn)
+
+	// 2. Cross-Attention
+	normX = RMSNorm(ctx.In("pre_cross_attention_norm"), x, 1e-6)
+	crossAttn := CrossAttention(ctx, normX, encoderStates, numHeads, headDim)
+	x = Add(x, crossAttn)
+
+	// 3. MLP
 	normX = RMSNorm(ctx.In("pre_mlp_norm"), x, 1e-6)
 	mlpOut := MLP(ctx, normX, intermediateDim)
 	x = Add(x, mlpOut)
@@ -69,6 +98,34 @@ func Gemma3Encoder(ctx *context.Context, x *Node) *Node {
 			currentSlidingWindow = -1
 		}
 		x = EncoderBlock(layerCtx, x, numHeads, numKVHeads, headDim, intermediateDim, currentSlidingWindow, ropeTheta)
+	}
+	return RMSNorm(ctx.In("final_norm"), x, 1e-6)
+}
+
+// Gemma3Decoder assembles 18 transformer layers for T5Gemma 2-270M decoder.
+func Gemma3Decoder(ctx *context.Context, x, encoderStates *Node) *Node {
+	ctx = ctx.In("gemma3_decoder")
+	numLayers := 18
+	numHeads := 4
+	numKVHeads := 1
+	headDim := 256
+	intermediateDim := 2048
+	slidingWindow := 512
+
+	// Create causal mask
+	g := x.Graph()
+	seqLen := x.Shape().Dimensions[1]
+	selfMask := layers.CausalMask(g, seqLen)
+
+	for i := 0; i < numLayers; i++ {
+		layerCtx := ctx.In(fmt.Sprintf("%d", i))
+		ropeTheta := 10000.0
+		currentSlidingWindow := slidingWindow
+		if (i+1)%6 == 0 {
+			ropeTheta = 1000000.0
+			currentSlidingWindow = -1
+		}
+		x = DecoderBlock(layerCtx, x, encoderStates, numHeads, numKVHeads, headDim, intermediateDim, currentSlidingWindow, ropeTheta, selfMask)
 	}
 	return RMSNorm(ctx.In("final_norm"), x, 1e-6)
 }

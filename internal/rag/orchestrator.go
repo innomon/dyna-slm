@@ -87,3 +87,59 @@ func (o *Orchestrator) Ingest(ctx context.Context, path string, metadata map[str
 	
 	return db.UpsertAsset(ctx, o.DB, asset)
 }
+
+// Generate uses the T5Gemma 2 decoder to produce a response, augmented by RAG context.
+func (o *Orchestrator) Generate(ctx context.Context, text string, imagePath string, maxTokens int) (string, error) {
+	// 1. RAG: Search for context
+	results, err := o.Search(ctx, text, imagePath, 3)
+	if err != nil {
+		return "", fmt.Errorf("search failed during generation: %w", err)
+	}
+
+	// 2. Build Prompt with context
+	prompt := "Context:\n"
+	for _, res := range results {
+		prompt += fmt.Sprintf("- Found in %s: %v\n", res.Path, res.Metadata)
+	}
+	prompt += "\nUser: " + text + "\nAssistant: "
+
+	// 3. Prepare Inputs
+	var imgT *tensors.Tensor
+	if imagePath != "" {
+		imgT, err = embedder.LoadImageAsTensor(imagePath)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		imgT = o.OrchestratorZeroImageTensor()
+	}
+
+	textIds, err := o.Tokenizer.Encode(prompt, true)
+	if err != nil {
+		return "", err
+	}
+
+	// 4. Generation Loop (Greedy)
+	decoderIds := []uint32{2} // BOS token
+	
+	for i := 0; i < maxTokens; i++ {
+		nextId, err := o.Model.GenerateStep(textIds, imgT, decoderIds)
+		if err != nil {
+			return "", err
+		}
+
+		if nextId == 1 { // EOS token
+			break
+		}
+
+		decoderIds = append(decoderIds, nextId)
+	}
+
+	// 5. Decode response
+	response, err := o.Tokenizer.Decode(decoderIds[1:]) // Skip BOS
+	if err != nil {
+		return "", err
+	}
+
+	return response, nil
+}

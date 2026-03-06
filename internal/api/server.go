@@ -64,24 +64,16 @@ func (s *Server) HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For now, return a simple RAG-augmented response if search finds something, 
-	// otherwise a static response since the decoder is not yet implemented.
-	// In a real scenario, this would call Orchestrator.Generate(...)
-	
 	lastMessage := ""
 	if len(req.Messages) > 0 {
 		lastMessage = req.Messages[len(req.Messages)-1].Content
 	}
 
-	// Perform search to show RAG capability
-	results, _ := s.Orchestrator.Search(r.Context(), lastMessage, "", 3)
-	
-	contextStr := ""
-	if len(results) > 0 {
-		contextStr = "\n\nContext found:\n"
-		for _, res := range results {
-			contextStr += fmt.Sprintf("- %s\n", res.Path)
-		}
+	// Call the actual generator
+	responseText, err := s.Orchestrator.Generate(r.Context(), lastMessage, "", 128)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Generation failed: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	resp := ChatCompletionResponse{
@@ -94,7 +86,7 @@ func (s *Server) HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 				Index: 0,
 				Message: ChatCompletionMessage{
 					Role:    "assistant",
-					Content: "Hello! I am the Dyna-SLM RAG assistant. " + contextStr,
+					Content: responseText,
 				},
 				FinishReason: "stop",
 			},

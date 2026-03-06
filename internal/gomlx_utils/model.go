@@ -32,9 +32,10 @@ func InitializeBackend() (backends.Backend, error) {
 
 // Model represents the T5Gemma 2 model context and weights.
 type Model struct {
-	Backend   backends.Backend
-	Context   *context.Context
-	ExecEmbed *graph.Exec
+	Backend      backends.Backend
+	Context      *context.Context
+	ExecEmbed    *graph.Exec
+	ExecGenerate *graph.Exec
 }
 
 // NewModel initializes the GoMLX context.
@@ -52,6 +53,13 @@ func (m *Model) CompileEmbed(buildFn func(ctx *context.Context, textIds, imagePi
 	})
 }
 
+// CompileGenerate compiles the multimodal generation graph.
+func (m *Model) CompileGenerate(buildFn func(ctx *context.Context, textIds, imagePixels, decoderIds *graph.Node) *graph.Node) {
+	m.ExecGenerate = graph.MustNewExec(m.Backend, func(textIds, imagePixels, decoderIds *graph.Node) *graph.Node {
+		return buildFn(m.Context, textIds, imagePixels, decoderIds)
+	})
+}
+
 // Embed executes the compiled GoMLX graph.
 func (m *Model) Embed(textIds []uint32, imageTensor *tensors.Tensor) ([]float32, error) {
 	if m.ExecEmbed == nil {
@@ -66,11 +74,7 @@ func (m *Model) Embed(textIds []uint32, imageTensor *tensors.Tensor) ([]float32,
 	}
 
 	outT := results[0]
-	// Using Value() to get the actual underlying slice (copy)
 	data := outT.Value()
-	// tensors.Value() returns []T or [][]T etc. for rank > 0.
-	// For Rank 2 [1, 640], it returns [][]float32.
-	// We want flat float32.
 	switch v := data.(type) {
 	case [][]float32:
 		return v[0], nil
@@ -79,6 +83,47 @@ func (m *Model) Embed(textIds []uint32, imageTensor *tensors.Tensor) ([]float32,
 	default:
 		return nil, fmt.Errorf("unexpected tensor output type: %T", data)
 	}
+}
+
+// GenerateStep executes one step of the generation graph.
+func (m *Model) GenerateStep(textIds []uint32, imageTensor *tensors.Tensor, decoderIds []uint32) (uint32, error) {
+	if m.ExecGenerate == nil {
+		return 0, fmt.Errorf("generation graph not compiled")
+	}
+
+	textT := tensors.FromFlatDataAndDimensions(textIds, 1, len(textIds))
+	decoderT := tensors.FromFlatDataAndDimensions(decoderIds, 1, len(decoderIds))
+
+	results := m.ExecGenerate.MustExec(textT, imageTensor, decoderT)
+	if len(results) == 0 {
+		return 0, fmt.Errorf("no output from graph execution")
+	}
+
+	// Logits shape: [batch=1, seq_len, vocab_size]
+	// We want the last token's prediction
+	outT := results[0]
+	data := outT.Value()
+	
+	var logits []float32
+	switch v := data.(type) {
+	case [][][]float32: // [batch][seq][vocab]
+		batch := v[0]
+		logits = batch[len(batch)-1]
+	default:
+		return 0, fmt.Errorf("unexpected logits tensor output type: %T", data)
+	}
+
+	// Greedy: find max logit
+	var maxIdx uint32
+	var maxVal float32 = -1e10
+	for i, val := range logits {
+		if val > maxVal {
+			maxVal = val
+			maxIdx = uint32(i)
+		}
+	}
+
+	return maxIdx, nil
 }
 
 // LoadSafetensors loads one or more .safetensors files into the model's context.

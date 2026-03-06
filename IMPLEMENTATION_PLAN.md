@@ -49,9 +49,9 @@ This plan outlines the steps for building the T5Gemma 2 multimodal RAG system.
 - [x] Implement JWT utility (`pkg/utils/jwt.go`) using EdDSA (Ed25519) from the standard library.
 - [x] Define OpenAI-compatible API types (`internal/api/types.go`).
 - [x] Implement JWT middleware and API handlers (`internal/api/server.go`) using public/private keys.
-- [x] Implement `/v1/chat/completions` (RAG-augmented stub), `/v1/embeddings`, and `/v1/models`.
+- [x] Implement `/v1/chat/completions` (RAG-augmented), `/v1/embeddings`, and `/v1/models`.
 - [x] Create main entry point `cmd/api/main.go` with Ed25519 key derivation.
-- [ ] Implement actual Gemma 2 decoder for `/v1/chat/completions`.
+- [x] Implement actual Gemma 2 decoder for `/v1/chat/completions`.
 - [ ] Add integration tests for OpenAI-compatible endpoints.
 
 ## Step-by-Step Details
