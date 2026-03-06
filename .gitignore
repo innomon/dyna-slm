@@ -1,0 +1,33 @@
+# Models
+models/
+
+# Binaries
+bin/
+/mcp-server
+/dyna-slm-api
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# GoMLX / XLA
+libxla_extension*
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Build artifacts
+*.test
+*.out
+
+# Environment variables
+.env
+.env.*
+
+# Logs
+*.log
+
+# Temp files
+tmp/
+.temp/
