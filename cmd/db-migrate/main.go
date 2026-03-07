@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	"github.com/gomlx/gomlx/pkg/core/tensors"
@@ -107,7 +106,7 @@ func main() {
 		log.Fatalf("Failed to get asset count from %s: %v", sourceTable, err)
 	}
 
-	fmt.Printf("🔄 Starting migration of %d records from %s (%s) to %s (%s)...\n", 
+	fmt.Printf("🔄 Starting migration of %d records from %s (%s) to %s (%s)...\n",
 		total, sourceName, sourceTable, targetName, outputTable)
 
 	batchSize := 10
