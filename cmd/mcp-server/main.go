@@ -7,10 +7,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/innomon/gomlx-pgvect-rag/internal/config"
-	"github.com/innomon/gomlx-pgvect-rag/internal/db"
-	"github.com/innomon/gomlx-pgvect-rag/internal/gomlx_utils"
-	"github.com/innomon/gomlx-pgvect-rag/internal/rag"
+	"github.com/innomon/gomlx-pgvect-rag/pkg/config"
+	"github.com/innomon/gomlx-pgvect-rag/pkg/db"
+	"github.com/innomon/gomlx-pgvect-rag/pkg/gomlx_utils"
+	"github.com/innomon/gomlx-pgvect-rag/pkg/rag"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	// Register XLA backend

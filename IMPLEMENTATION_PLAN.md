@@ -19,7 +19,7 @@ This plan outlines the steps for building the T5Gemma 2 multimodal RAG system.
 - [x] Create `filesys` table with `path` (PK), `metadata` (JSONB), `content` (BYTEA), `embedding` (vector(640)).
 - [x] Create GIN index for metadata.
 - [x] Create HNSW index for embeddings with `vector_cosine_ops`.
-- [x] Implement `internal/db/upsert.go` with `ON CONFLICT` support for the `filesys` table.
+- [x] Implement `pkg/db/upsert.go` with `ON CONFLICT` support for the `filesys` table.
 
 ### Phase 3: Image Preprocessing (GoMLX)
 - [x] Implement Go logic to decode JPG/PNG and resize to **896x896** using Lanczos resampling.
@@ -47,8 +47,8 @@ This plan outlines the steps for building the T5Gemma 2 multimodal RAG system.
 
 ### Phase 7: OpenAI-Compatible API Layer
 - [x] Implement JWT utility (`pkg/utils/jwt.go`) using EdDSA (Ed25519) from the standard library.
-- [x] Define OpenAI-compatible API types (`internal/api/types.go`).
-- [x] Implement JWT middleware and API handlers (`internal/api/server.go`) using public/private keys.
+- [x] Define OpenAI-compatible API types (`pkg/api/types.go`).
+- [x] Implement JWT middleware and API handlers (`pkg/api/server.go`) using public/private keys.
 - [x] Implement `/v1/chat/completions` (RAG-augmented), `/v1/embeddings`, and `/v1/models`.
 - [x] Create main entry point `cmd/api/main.go` with Ed25519 key derivation.
 - [x] Implement actual Gemma 2 decoder for `/v1/chat/completions`.
@@ -56,9 +56,9 @@ This plan outlines the steps for building the T5Gemma 2 multimodal RAG system.
 
 ### Phase 8: IBM Granite 4.0 350M-H Integration
 - [x] Research Granite 4.0 Hybrid (Mamba-2 + Transformer) architecture.
-- [x] Implement `internal/embedder/granite.go` with hybrid layer support.
-- [x] Update `internal/embedder/config.go` with `GraniteHybridConfig`.
-- [x] Implement dispatcher in `internal/embedder/embedder.go`.
+- [x] Implement `pkg/embedder/granite.go` with hybrid layer support.
+- [x] Update `pkg/embedder/config.go` with `GraniteHybridConfig`.
+- [x] Implement dispatcher in `pkg/embedder/embedder.go`.
 - [x] Update API and MCP main entry points to support both models.
 - [x] Verify 768-dimension embedding output.
 - [x] Performance benchmarking for hybrid inference.

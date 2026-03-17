@@ -7,13 +7,13 @@ This plan outlines the implementation steps for the Dyna-SLM architecture, trans
 ### Phase 1: Configuration & Infrastructure
 - [x] Define the `DynaModelConfig` struct (including `WeightsPath` and `PreFilterSQL`).
 - [x] Implement a configuration loader for multiple model variants.
-- [x] Refactor `internal/db` to support dynamic SQL generation with pre-filters (metadata/sub-path).
-- [x] Refactor `internal/db` to support multiple tables/databases dynamically based on embedding dimension.
+- [x] Refactor `pkg/db` to support dynamic SQL generation with pre-filters (metadata/sub-path).
+- [x] Refactor `pkg/db` to support multiple tables/databases dynamically based on embedding dimension.
 - [x] Update SQL schema to include dimension-specific tables (e.g., `filesys_640`, `filesys_768`).
 
 ### Phase 2: Embedded RAG Layer (GoMLX)
-- [x] Modify `internal/embedder` to load weights from `WeightsPath` specified in the configuration.
-- [x] Modify `internal/embedder` to expose intermediate encoder hidden states.
+- [x] Modify `pkg/embedder` to load weights from `WeightsPath` specified in the configuration.
+- [x] Modify `pkg/embedder` to expose intermediate encoder hidden states.
 - [x] Implement the **Latent Retrieval Step**:
     - [x] Run the encoder graph.
     - [x] Extract the mean-pooled vector.
@@ -25,7 +25,7 @@ This plan outlines the implementation steps for the Dyna-SLM architecture, trans
 
 ### Phase 3: Dynamic Model Registry
 - [x] Implement a `ModelRegistry` that initializes and holds multiple GoMLX models (Gemma 3, Granite) based on the config file.
-- [x] Update `internal/api` to dynamically populate `/v1/models` from the registry.
+- [x] Update `pkg/api` to dynamically populate `/v1/models` from the registry.
 - [x] Update `/v1/chat/completions` to route requests to the correct model variant and perform the embedded RAG flow.
 
 ### Phase 4: Reference Management
@@ -38,7 +38,7 @@ This plan outlines the implementation steps for the Dyna-SLM architecture, trans
 - [x] Define Dyna-specific MCP tools: `dyna_search`, `dyna_ingest`, `dyna_list_variants`.
 
 ### Phase 6: Validation & Verification
-- [x] Create test scripts for each model variant (see `internal/db/db_test.go`).
+- [x] Create test scripts for each model variant (see `pkg/db/db_test.go`).
 - [x] Verify that embeddings from the encoder correctly retrieve relevant records from their respective dimension-specific tables.
 - [x] Verify the "References" section in the chat output.
 - [x] Benchmark latency of the embedded RAG layer versus standard RAG.

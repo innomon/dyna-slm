@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/innomon/gomlx-pgvect-rag/internal/rag"
+	"github.com/innomon/gomlx-pgvect-rag/pkg/rag"
 	"github.com/innomon/gomlx-pgvect-rag/pkg/utils"
 )
 

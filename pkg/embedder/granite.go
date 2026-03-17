@@ -115,7 +115,7 @@ func GraniteAttentionBlock(ctx *context.Context, x *Node, cfg *GraniteHybridConf
 	// headDim = HiddenSize / NumAttentionHeads = 768 / 12 = 64
 	headDim := cfg.HiddenSize / cfg.NumAttentionHeads
 
-	// Fix MultiHeadAttention call to match internal/embedder/transformer.go signature:
+	// Fix MultiHeadAttention call to match pkg/embedder/transformer.go signature:
 	// func MultiHeadAttention(ctx *context.Context, x *Node, numHeads, numKVHeads, headDim, slidingWindow int, ropeTheta float64, useCausalMask bool) *Node
 	attn := MultiHeadAttention(attnCtx, x, cfg.NumAttentionHeads, cfg.NumKeyValueHeads, headDim, -1, cfg.RoPETheta, true)
 	x = Add(x, attn)

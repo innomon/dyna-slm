@@ -13,7 +13,7 @@ import (
 	"github.com/gomlx/gomlx/pkg/core/shapes"
 	"github.com/gomlx/gomlx/pkg/core/tensors"
 	"github.com/gomlx/gomlx/pkg/ml/context"
-	"github.com/innomon/gomlx-pgvect-rag/internal/embedder"
+	"github.com/innomon/gomlx-pgvect-rag/pkg/embedder"
 	"github.com/nlpodyssey/safetensors"
 )
 

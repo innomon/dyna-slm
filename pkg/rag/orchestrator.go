@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/gomlx/gomlx/pkg/core/tensors"
-	"github.com/innomon/gomlx-pgvect-rag/internal/config"
-	"github.com/innomon/gomlx-pgvect-rag/internal/db"
-	"github.com/innomon/gomlx-pgvect-rag/internal/embedder"
-	"github.com/innomon/gomlx-pgvect-rag/internal/gomlx_utils"
+	"github.com/innomon/gomlx-pgvect-rag/pkg/config"
+	"github.com/innomon/gomlx-pgvect-rag/pkg/db"
+	"github.com/innomon/gomlx-pgvect-rag/pkg/embedder"
+	"github.com/innomon/gomlx-pgvect-rag/pkg/gomlx_utils"
 	"github.com/innomon/gomlx-pgvect-rag/pkg/utils"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

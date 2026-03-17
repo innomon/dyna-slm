@@ -33,4 +33,4 @@ Goose will then:
 3. Call `ingest_asset` for every file it found.
 
 ## Performance Tip
-If you are ingesting thousands of files, it is more efficient to use a Go script that directly calls `internal/rag/orchestrator.go`'s `Ingest` method to avoid the JSON-RPC overhead of individual tool calls.
+If you are ingesting thousands of files, it is more efficient to use a Go script that directly calls `pkg/rag/orchestrator.go`'s `Ingest` method to avoid the JSON-RPC overhead of individual tool calls.
