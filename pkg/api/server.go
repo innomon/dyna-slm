@@ -104,6 +104,88 @@ func (s *Server) HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// Handler for /v1/responses (New)
+func (s *Server) HandleResponses(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ResponseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// Select the correct orchestrator from the registry
+	orch, err := s.Registry.GetOrchestrator(req.Model)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Model not found: %v", err), http.StatusNotFound)
+		return
+	}
+
+	// Extract text from input
+	inputText := ""
+	switch v := req.Input.(type) {
+	case string:
+		inputText = v
+	case []interface{}:
+		// Parse ResponseItem array from generic map
+		for _, item := range v {
+			if m, ok := item.(map[string]interface{}); ok {
+				if content, ok := m["content"].([]interface{}); ok {
+					for _, c := range content {
+						if cp, ok := c.(map[string]interface{}); ok {
+							if cp["type"] == "text" {
+								if text, ok := cp["text"].(string); ok {
+									inputText += text + "\n"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Prepend instructions if provided
+	fullPrompt := ""
+	if req.Instructions != "" {
+		fullPrompt = req.Instructions + "\n\n"
+	}
+	fullPrompt += inputText
+
+	// Call the actual dyna generator (Embedded RAG)
+	responseText, err := orch.DynaGenerate(r.Context(), fullPrompt, "", 128)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Generation failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	resp := ResponseResponse{
+		Id:      "resp-" + time.Now().Format("20060102150405"),
+		Object:  "response",
+		Created: time.Now().Unix(),
+		Model:   req.Model,
+		Output: []ResponseItem{
+			{
+				Id:   "item-" + time.Now().Format("20060102150405-01"),
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponseContent{
+					{
+						Type: "text",
+						Text: responseText,
+					},
+				},
+			},
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
 // Handler for /v1/embeddings
 func (s *Server) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -198,6 +280,7 @@ func (s *Server) HandleModels(w http.ResponseWriter, r *http.Request) {
 // RegisterHandlers sets up the routes
 func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/chat/completions", s.AuthMiddleware(s.HandleChatCompletions))
+	mux.HandleFunc("/v1/responses", s.AuthMiddleware(s.HandleResponses))
 	mux.HandleFunc("/v1/embeddings", s.AuthMiddleware(s.HandleEmbeddings))
 	mux.HandleFunc("/v1/models", s.AuthMiddleware(s.HandleModels))
 	

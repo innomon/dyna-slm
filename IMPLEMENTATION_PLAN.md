@@ -68,6 +68,13 @@ This plan outlines the steps for building the T5Gemma 2 multimodal RAG system.
 - [x] Add support for batch metadata modifications during migration.
 - [x] Implement paginated database retrieval for large-scale migrations.
 
+### Phase 10: Responses API Implementation
+- [x] Define Responses API types in `pkg/api/types.go` (`ResponseRequest`, `ResponseItem`, `ResponseResponse`).
+- [x] Implement `HandleResponses` in `pkg/api/server.go` to support the unified interface.
+- [x] Map `instructions` and `input` (text/items) to the underlying `DynaGenerate` RAG flow.
+- [x] Register the `/v1/responses` route in the API server.
+- [ ] Add integration tests for the Responses API endpoint.
+
 ## Step-by-Step Details
 
 ### DB Creation SQL

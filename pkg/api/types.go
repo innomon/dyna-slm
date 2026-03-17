@@ -32,6 +32,45 @@ type ChatCompletionChoice struct {
 	FinishReason string                `json:"finish_reason"`
 }
 
+// Responses API Types (New)
+type ResponseRequest struct {
+	Model          string      `json:"model"`
+	Input          interface{} `json:"input"` // Can be string or []ResponseItem
+	Instructions   string      `json:"instructions,omitempty"`
+	Store          bool        `json:"store,omitempty"`
+	ConversationId string      `json:"conversation_id,omitempty"`
+	Metadata       interface{} `json:"metadata,omitempty"`
+	Stream         bool        `json:"stream,omitempty"`
+}
+
+type ResponseItem struct {
+	Id      string            `json:"id,omitempty"`
+	Type    string            `json:"type"` // "message", "function_call", "function_call_output"
+	Role    string            `json:"role,omitempty"`
+	Content []ResponseContent `json:"content,omitempty"`
+}
+
+type ResponseContent struct {
+	Type string `json:"type"` // "text", "image_url"
+	Text string `json:"text,omitempty"`
+}
+
+type ResponseResponse struct {
+	Id             string         `json:"id"`
+	Object         string         `json:"object"`
+	Created        int64          `json:"created"`
+	Model          string         `json:"model"`
+	Output         []ResponseItem `json:"output"`
+	ConversationId string         `json:"conversation_id,omitempty"`
+	Usage          Usage          `json:"usage,omitempty"`
+}
+
+type Usage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
 type EmbeddingResponse struct {
 	Object string          `json:"object"`
 	Data   []EmbeddingData `json:"data"`

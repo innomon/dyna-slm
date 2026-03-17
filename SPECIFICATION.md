@@ -75,6 +75,9 @@ The system provides a JWT-secured REST API compatible with the OpenAI specificat
 - **`POST /v1/chat/completions`**: RAG-augmented chat interface.
   - Automatically performs similarity search on user input.
   - Augments the prompt with retrieved context.
+- **`POST /v1/responses`**: Unified, stateful-ready interface (successor to Chat Completions).
+  - Uses the "Items" model for flexible, agentic workflows.
+  - Supports `instructions` and `input` (text or item array).
 - **`POST /v1/embeddings`**: Direct access to the T5Gemma 2 multimodal embedding model.
   - Accepts text input and returns 640-dimension vectors.
 - **`GET /v1/models`**: Returns information about the available T5Gemma 2 model.
