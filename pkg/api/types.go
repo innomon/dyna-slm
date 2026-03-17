@@ -2,14 +2,49 @@ package api
 
 // OpenAI Request Types
 type ChatCompletionRequest struct {
-	Model    string                  `json:"model"`
-	Messages []ChatCompletionMessage `json:"messages"`
-	Stream   bool                    `json:"stream"`
+	Model      string                  `json:"model"`
+	Messages   []ChatCompletionMessage `json:"messages"`
+	Stream     bool                    `json:"stream"`
+	Tools      []Tool                  `json:"tools,omitempty"`
+	ToolChoice interface{}             `json:"tool_choice,omitempty"` // "none", "auto", "required", or ToolChoice object
 }
 
 type ChatCompletionMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallId string     `json:"tool_call_id,omitempty"` // For role: "tool"
+}
+
+type Tool struct {
+	Type     string             `json:"type"` // always "function"
+	Function FunctionDefinition `json:"function"`
+}
+
+type FunctionDefinition struct {
+	Name        string      `json:"name"`
+	Description string      `json:"description,omitempty"`
+	Parameters  interface{} `json:"parameters,omitempty"` // JSON Schema
+}
+
+type ToolCall struct {
+	Id       string           `json:"id"`
+	Type     string           `json:"type"` // always "function"
+	Function FunctionInstance `json:"function"`
+}
+
+type FunctionInstance struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"` // JSON string
+}
+
+type ToolChoice struct {
+	Type     string               `json:"type"`
+	Function ToolChoiceFunction `json:"function"`
+}
+
+type ToolChoiceFunction struct {
+	Name string `json:"name"`
 }
 
 type EmbeddingRequest struct {
@@ -41,6 +76,8 @@ type ResponseRequest struct {
 	ConversationId string      `json:"conversation_id,omitempty"`
 	Metadata       interface{} `json:"metadata,omitempty"`
 	Stream         bool        `json:"stream,omitempty"`
+	Tools          []Tool      `json:"tools,omitempty"`
+	ToolChoice     interface{} `json:"tool_choice,omitempty"`
 }
 
 type ResponseItem struct {
@@ -48,6 +85,8 @@ type ResponseItem struct {
 	Type    string            `json:"type"` // "message", "function_call", "function_call_output"
 	Role    string            `json:"role,omitempty"`
 	Content []ResponseContent `json:"content,omitempty"`
+	Call    *ToolCall         `json:"call,omitempty"`
+	Output  string            `json:"output,omitempty"`
 }
 
 type ResponseContent struct {

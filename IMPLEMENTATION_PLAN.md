@@ -75,6 +75,14 @@ This plan outlines the steps for building the T5Gemma 2 multimodal RAG system.
 - [x] Register the `/v1/responses` route in the API server.
 - [ ] Add integration tests for the Responses API endpoint.
 
+### Phase 11: Function Calling & Tool Integration
+- [x] Define OpenAI-compatible tool types in `pkg/api/types.go` (`Tool`, `ToolCall`, `FunctionDefinition`, etc.).
+- [x] Implement `pkg/api/tools.go` with JSON Schema definitions for `search_multimodal`, `ingest_asset`, and `list_variants`.
+- [x] Implement `ExecuteTool` dispatcher to map tool calls to RAG orchestrator methods.
+- [x] Add `tool_choice` support to `HandleChatCompletions` and `HandleResponses` in `pkg/api/server.go`.
+- [x] Implement direct tool execution for forced tool calls (`tool_choice`).
+- [ ] Add integration tests for function calling in both APIs.
+
 ## Step-by-Step Details
 
 ### DB Creation SQL

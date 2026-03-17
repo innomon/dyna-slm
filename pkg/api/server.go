@@ -64,6 +64,70 @@ func (s *Server) HandleChatCompletions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 1. Check if a specific tool is requested via ToolChoice
+	if req.ToolChoice != nil {
+		if tc, ok := req.ToolChoice.(map[string]interface{}); ok {
+			if funcObj, ok := tc["function"].(map[string]interface{}); ok {
+				name, _ := funcObj["name"].(string)
+				if name != "" {
+					// Execute requested tool directly (forced tool call)
+					// We need arguments from the last message or empty
+					args := "{}"
+					if len(req.Messages) > 0 {
+						// Simple heuristic: if the last message is JSON, use it as args
+						var m map[string]interface{}
+						if err := json.Unmarshal([]byte(req.Messages[len(req.Messages)-1].Content), &m); err == nil {
+							args = req.Messages[len(req.Messages)-1].Content
+						}
+					}
+
+					_, err := ExecuteTool(r.Context(), s.Registry, name, args)
+					if err != nil {
+						http.Error(w, fmt.Sprintf("Tool execution failed: %v", err), http.StatusInternalServerError)
+						return
+					}
+
+					resp := ChatCompletionResponse{
+						Id:      "chatcmpl-" + time.Now().Format("20060102150405"),
+						Object:  "chat.completion",
+						Created: time.Now().Unix(),
+						Model:   req.Model,
+						Choices: []ChatCompletionChoice{
+							{
+								Index: 0,
+								Message: ChatCompletionMessage{
+									Role: "assistant",
+									ToolCalls: []ToolCall{
+										{
+											Id:   "call_" + time.Now().Format("20060102150405"),
+											Type: "function",
+											Function: FunctionInstance{
+												Name:      name,
+												Arguments: args,
+											},
+										},
+									},
+								},
+								FinishReason: "tool_calls",
+							},
+						},
+					}
+					// If this was a tool role message, we'd return the output. 
+					// But usually, the assistant returns the ToolCall first.
+					// If the last message WAS a tool call result, we should continue generation.
+					lastMsg := req.Messages[len(req.Messages)-1]
+					if lastMsg.Role == "tool" {
+						// Continue with generation, ignoring tool_choice for now to avoid loops
+					} else {
+						w.Header().Set("Content-Type", "application/json")
+						json.NewEncoder(w).Encode(resp)
+						return
+					}
+				}
+			}
+		}
+	}
+
 	// Select the correct orchestrator from the registry
 	orch, err := s.Registry.GetOrchestrator(req.Model)
 	if err != nil {
@@ -115,6 +179,61 @@ func (s *Server) HandleResponses(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
+	}
+
+	// 1. Check for tool_choice in Responses API
+	if req.ToolChoice != nil {
+		// Similar logic to ChatCompletions
+		if tc, ok := req.ToolChoice.(map[string]interface{}); ok {
+			if funcObj, ok := tc["function"].(map[string]interface{}); ok {
+				name, _ := funcObj["name"].(string)
+				if name != "" {
+					args := "{}"
+					// Try to extract arguments from input if it's a string
+					if s, ok := req.Input.(string); ok {
+						var m map[string]interface{}
+						if err := json.Unmarshal([]byte(s), &m); err == nil {
+							args = s
+						}
+					}
+
+					output, err := ExecuteTool(r.Context(), s.Registry, name, args)
+					if err != nil {
+						http.Error(w, fmt.Sprintf("Tool execution failed: %v", err), http.StatusInternalServerError)
+						return
+					}
+
+					resp := ResponseResponse{
+						Id:      "resp-" + time.Now().Format("20060102150405"),
+						Object:  "response",
+						Created: time.Now().Unix(),
+						Model:   req.Model,
+						Output: []ResponseItem{
+							{
+								Id:   "item-" + time.Now().Format("20060102150405-01"),
+								Type: "function_call",
+								Call: &ToolCall{
+									Id:   "call_" + time.Now().Format("20060102150405"),
+									Type: "function",
+									Function: FunctionInstance{
+										Name:      name,
+										Arguments: args,
+									},
+								},
+							},
+							{
+								Id:     "item-" + time.Now().Format("20060102150405-02"),
+								Type:   "function_call_output",
+								Output: output,
+							},
+						},
+					}
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(resp)
+					return
+				}
+			}
+		}
 	}
 
 	// Select the correct orchestrator from the registry

@@ -75,14 +75,18 @@ The system provides a JWT-secured REST API compatible with the OpenAI specificat
 - **`POST /v1/chat/completions`**: RAG-augmented chat interface.
   - Automatically performs similarity search on user input.
   - Augments the prompt with retrieved context.
+  - **Function Calling**: Supports OpenAI-compatible `tools` and `tool_choice`.
 - **`POST /v1/responses`**: Unified, stateful-ready interface (successor to Chat Completions).
   - Uses the "Items" model for flexible, agentic workflows.
   - Supports `instructions` and `input` (text or item array).
+  - **Function Calling**: Supports `tools`, `tool_choice`, and returns `function_call` / `function_call_output` items.
 - **`POST /v1/embeddings`**: Direct access to the T5Gemma 2 multimodal embedding model.
-  - Accepts text input and returns 640-dimension vectors.
-- **`GET /v1/models`**: Returns information about the available T5Gemma 2 model.
-- **`GET /auth/token`**: (Development Only) Utility to generate a temporary test token.
+...
+### 6.4. Available Tools (Function Calling)
+The API exposes the following tools, matching the MCP server capabilities:
+- **`search_multimodal`**: Search for relevant text or image assets in the multimodal RAG store.
+  - Arguments: `model` (required), `query_text`, `query_image_path`, `limit`.
+- **`ingest_asset`**: Ingest a new file (image or text) into the multimodal RAG store.
+  - Arguments: `model` (required), `path` (required).
+- **`list_variants`**: List all available Dyna-SLM model variants.
 
-### 6.3. Implementation
-- **Framework:** Go standard library (`net/http`) for maximum performance and minimal footprint.
-- **Security:** Custom JWT implementation avoiding external dependencies.

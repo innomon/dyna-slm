@@ -15,7 +15,7 @@ A high-performance Multimodal Retrieval-Augmented Generation (RAG) system with a
 - **Verifiable Output:** Automatically appends source references to the generated response.
 - **Dual Interface:** 
   - **MCP Native:** Tools for AI clients (Goose, Claude, Gemini).
-  - **OpenAI Compatible:** JWT-secured REST API (Ed25519) for AnythingLLM, Goose, etc.
+  - **OpenAI Compatible:** JWT-secured REST API (Ed25519) with **Function Calling** support for `search_multimodal`, `ingest_asset`, and `list_variants`.
 
 ## 📋 Prerequisites
 1. **Go 1.25+**
