@@ -81,7 +81,10 @@ The system provides a JWT-secured REST API compatible with the OpenAI specificat
   - Supports `instructions` and `input` (text or item array).
   - **Function Calling**: Supports `tools`, `tool_choice`, and returns `function_call` / `function_call_output` items.
 - **`POST /v1/embeddings`**: Direct access to the T5Gemma 2 multimodal embedding model.
-...
+  - Accepts text input and returns 640-dimension vectors.
+- **`GET /v1/models`**: Returns information about the available Dyna-SLM models.
+- **`GET /v1/tools`**: Returns the list of available tools for function calling.
+- **`GET /auth/token`**: (Development Only) Utility to generate a temporary test token.
 ### 6.4. Available Tools (Function Calling)
 The API exposes the following tools, matching the MCP server capabilities:
 - **`search_multimodal`**: Search for relevant text or image assets in the multimodal RAG store.

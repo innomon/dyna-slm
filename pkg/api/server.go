@@ -396,12 +396,26 @@ func (s *Server) HandleModels(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// Handler for /v1/tools
+func (s *Server) HandleTools(w http.ResponseWriter, r *http.Request) {
+	resp := struct {
+		Object string `json:"object"`
+		Data   []Tool `json:"data"`
+	}{
+		Object: "list",
+		Data:   AvailableTools,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
 // RegisterHandlers sets up the routes
 func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/chat/completions", s.AuthMiddleware(s.HandleChatCompletions))
 	mux.HandleFunc("/v1/responses", s.AuthMiddleware(s.HandleResponses))
 	mux.HandleFunc("/v1/embeddings", s.AuthMiddleware(s.HandleEmbeddings))
 	mux.HandleFunc("/v1/models", s.AuthMiddleware(s.HandleModels))
+	mux.HandleFunc("/v1/tools", s.AuthMiddleware(s.HandleTools))
 	
 	// Open endpoint to get a token for demo/testing
 	mux.HandleFunc("/auth/token", func(w http.ResponseWriter, r *http.Request) {
