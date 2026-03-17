@@ -38,3 +38,5 @@ A Multimodal Retrieval-Augmented Generation (RAG) system built with:
 ## Documentation
 - Always update `SPECIFICATION.md` for architectural changes.
 - Track implementation progress in `IMPLEMENTATION_PLAN.md`.
+- **Mandatory:** Refer to `AGENT.md` for all hierarchical memory and RAG operations (UniContext).
+- Detailed UniContext design and setup are in `docs/install-unicontext-memory/`.

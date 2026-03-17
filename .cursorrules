@@ -1,0 +1,16 @@
+# Cursor Rules for Dyna-SLM (UniContext)
+
+## Hierarchical Memory (UniContext)
+- **Mandatory Procedure:** All RAG and memory operations MUST follow the `AGENT.md` guidelines.
+- **Path Mapping:** Map `viking://` to the `/unicontext/` path prefix in the `filesys` table.
+- **Tiered Retrieval (Scan-Before-Read):**
+  1. Use `search_multimodal` to scan for `.../abstract` (L0) entries first.
+  2. If relevant, drill down to `.../overview` (L1).
+  3. Only load `.../details` (L2) if absolutely necessary.
+- **Tiered Ingestion:** When saving info, create L0, L1, and L2 layers as separate database entries.
+- **No Code Changes:** Do not modify the Go source code or the Postgres schema. UniContext is implemented purely through naming conventions and agent behavior.
+
+## Core Mandates
+- **Security:** Never log or commit secrets or API keys.
+- **Efficiency:** Use semantic searches with path prefixes to minimize result filtering.
+- **Context:** Always maintain the link to the hierarchical filesystem by including the `path` in summaries.
