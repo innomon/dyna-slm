@@ -253,7 +253,10 @@ func (m *Model) LoadSafetensors(weightsDir string) error {
 				continue
 			}
 
-			m.Context.In(gomlxScope).VariableWithShape("weight", shapes.Make(goMLXTensor.DType(), shape...)).MustSetValue(goMLXTensor)
+			err = m.Context.In(gomlxScope).VariableWithShape("weight", shapes.Make(goMLXTensor.DType(), shape...)).SetValue(goMLXTensor)
+			if err != nil {
+				return fmt.Errorf("failed to set weight for %s: %w", name, err)
+			}
 		}
 	}
 
